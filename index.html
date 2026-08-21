@@ -801,13 +801,15 @@
       }
     }
 
-    // --- 前端直連氣象署 (多重 CORS 代理備援與防快取) ---
+    const CWA_API_KEY = 'CWA-8059CE68-7A75-4C3D-BDA6-CBF3BC6447EF';
+
+    // --- 前端直連氣象署 (官方 OpenData API + JSONP 零跨域限制) ---
     async function directFallback() {
       const result = { radar: null, rainfall: null };
       const cacheBust = Date.now();
 
       // 1. 直連雷達 (JSONP 腳本注入，零 CORS 限制)
-      await new Promise((resolve) => {
+      const radarPromise = new Promise((resolve) => {
         const oldScript = document.getElementById('cwaRadarScript');
         if (oldScript) oldScript.remove();
         const script = document.createElement('script');
@@ -827,73 +829,62 @@
         document.body.appendChild(script);
       });
 
-      // 2. 直連高雄雨量 (多重代理依序嘗試)
-      const targetCwaUrl = `https://www.cwa.gov.tw/V8/C/P/Rainfall/MOD_10M/64.html?_=${cacheBust}`;
-      const proxyList = [
-        `https://corsproxy.io/?${encodeURIComponent(targetCwaUrl)}`,
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(targetCwaUrl)}`,
-        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetCwaUrl)}`
-      ];
-
-      for (const proxyUrl of proxyList) {
+      // 2. 直連高雄雨量 (使用氣象署官方 OpenData API，完全支援瀏覽器跨網域 CORS)
+      const rainfallPromise = (async () => {
         try {
-          const res = await fetch(proxyUrl, { cache: 'no-store' });
+          const cwaUrl = `https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0002-001?Authorization=${CWA_API_KEY}&StationId=C0V450,C0V840&_=${cacheBust}`;
+          const res = await fetch(cwaUrl);
           if (res.ok) {
-            const html = await res.text();
-            if (html && html.includes('table')) {
-              const doc = new DOMParser().parseFromString(html, 'text/html');
-              const trs = doc.querySelectorAll('tr');
-              const stations = [];
-              trs.forEach(tr => {
-                const th = tr.querySelector('th[headers="station"]');
-                if (!th) return;
-                const tds = tr.querySelectorAll('td');
-                if (tds.length < 6) return;
-                const code = th.id.replace('C640_', '');
-                const name = th.innerText.trim();
-                const clean = txt => (txt || '').replace(/[&nbsp;\s]/g, '').trim() || '0.0';
-                const toNum = txt => {
-                  const n = parseFloat(clean(txt));
-                  return isNaN(n) ? 0.0 : n;
-                };
-                stations.push({
-                  code: code,
-                  name: name,
-                  ten_min: clean(tds[0].innerText),
-                  ten_min_num: toNum(tds[0].innerText),
-                  one_hr: clean(tds[1].innerText),
-                  one_hr_num: toNum(tds[1].innerText),
-                  three_hr: clean(tds[2].innerText),
-                  three_hr_num: toNum(tds[2].innerText),
-                  all_hr: clean(tds[4].innerText),
-                  all_hr_num: toNum(tds[4].innerText),
-                  today: clean(tds[5].innerText),
-                  today_num: toNum(tds[5].innerText)
-                });
-              });
-              if (stations.length > 0) {
-                result.rainfall = { stations: stations };
-                break; // 成功解析即退出重試
-              }
+            const data = await res.json();
+            const stationsData = data?.records?.Station || [];
+            const cleanNum = v => {
+              const n = parseFloat(v);
+              return isNaN(n) || n < 0 ? 0.0 : n;
+            };
+            const stations = stationsData.map(st => {
+              const rf = st.RainfallElement || {};
+              const ten_min = rf.Past10Min?.Precipitation ?? '-';
+              const one_hr = rf.Past1hr?.Precipitation ?? '-';
+              const three_hr = rf.Past3hr?.Precipitation ?? '-';
+              const all_hr = rf.Past24hr?.Precipitation ?? '-';
+              const today = rf.Now?.Precipitation ?? '-';
+              return {
+                code: st.StationId ? st.StationId.replace(/0$/, '') : '',
+                name: st.StationName || '',
+                ten_min: String(ten_min),
+                ten_min_num: cleanNum(ten_min),
+                one_hr: String(one_hr),
+                one_hr_num: cleanNum(one_hr),
+                three_hr: String(three_hr),
+                three_hr_num: cleanNum(three_hr),
+                all_hr: String(all_hr),
+                all_hr_num: cleanNum(all_hr),
+                today: String(today),
+                today_num: cleanNum(today)
+              };
+            });
+
+            if (stations.length > 0) {
+              result.rainfall = { stations: stations };
+              return;
             }
           }
-        } catch (proxyErr) {
-          console.warn(`Proxy ${proxyUrl} failed, trying next...`);
+        } catch (e) {
+          console.warn('OpenData API fetch error:', e);
         }
-      }
+      })();
 
+      await Promise.all([radarPromise, rainfallPromise]);
       return result;
     }
-
-
 
     // --- 渲染 2 個小港測站雨量卡片 (鳳森 + 鳳鼻頭) ---
     function renderRainfall(data) {
       if (!data || !data.stations) return;
       state.stations = data.stations;
 
-      const fs = data.stations.find(s => s.code === 'C0V45') || {};
-      const fbt = data.stations.find(s => s.code === 'C0V84') || {};
+      const fs = data.stations.find(s => s.code === 'C0V45' || s.code === 'C0V450' || (s.name && s.name.includes('鳳森'))) || {};
+      const fbt = data.stations.find(s => s.code === 'C0V84' || s.code === 'C0V840' || (s.name && s.name.includes('鳳鼻頭'))) || {};
 
       fillCard('fs', fs);
       fillCard('fbt', fbt);
