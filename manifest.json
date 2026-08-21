@@ -1,0 +1,21 @@
+{
+  "name": "高雄小港/林園 氣象即時監控",
+  "short_name": "高雄氣象",
+  "description": "即時林園降雨雷達 (250m) 與小港雨量監控",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0b1120",
+  "theme_color": "#0b1120",
+  "icons": [
+    {
+      "src": "https://www.cwa.gov.tw/V8/assets/img/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://www.cwa.gov.tw/V8/assets/img/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
