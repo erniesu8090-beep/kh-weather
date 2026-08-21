@@ -3,6 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -797,9 +801,10 @@
       }
     }
 
-    // --- 前端直連氣象署 (無後端獨立運作) ---
+    // --- 前端直連氣象署 (多重 CORS 代理備援與防快取) ---
     async function directFallback() {
       const result = { radar: null, rainfall: null };
+      const cacheBust = Date.now();
 
       // 1. 直連雷達 (JSONP 腳本注入，零 CORS 限制)
       await new Promise((resolve) => {
@@ -807,11 +812,11 @@
         if (oldScript) oldScript.remove();
         const script = document.createElement('script');
         script.id = 'cwaRadarScript';
-        script.src = `https://www.cwa.gov.tw/Data/js/obs_img/Observe_radar_rain.js?_=${Date.now()}`;
+        script.src = `https://www.cwa.gov.tw/Data/js/obs_img/Observe_radar_rain.js?_=${cacheBust}`;
         script.onload = () => {
           if (window.RadarRainImg && window.RadarRainImg.Area2) {
             const scans = Object.values(window.RadarRainImg.Area2.size0 || {}).map(i => ({
-              url: `https://www.cwa.gov.tw/Data/radar_rain/${i.img}`,
+              url: `https://www.cwa.gov.tw/Data/radar_rain/${i.img}?_=${cacheBust}`,
               time: i.text
             }));
             result.radar = { areas: { Area2: { scans_hd: scans } } };
@@ -822,50 +827,64 @@
         document.body.appendChild(script);
       });
 
-      // 2. 直連高雄雨量 (透過 CORS 代理)
-      try {
-        const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent('https://www.cwa.gov.tw/V8/C/P/Rainfall/MOD_10M/64.html?_=' + Date.now());
-        const res = await fetch(proxyUrl);
-        if (res.ok) {
-          const html = await res.text();
-          const doc = new DOMParser().parseFromString(html, 'text/html');
-          const trs = doc.querySelectorAll('tr');
-          const stations = [];
-          trs.forEach(tr => {
-            const th = tr.querySelector('th[headers="station"]');
-            if (!th) return;
-            const tds = tr.querySelectorAll('td');
-            if (tds.length < 6) return;
-            const code = th.id.replace('C640_', '');
-            const name = th.innerText.trim();
-            const clean = txt => (txt || '').replace(/[&nbsp;\s]/g, '').trim() || '0.0';
-            const toNum = txt => {
-              const n = parseFloat(clean(txt));
-              return isNaN(n) ? 0.0 : n;
-            };
-            stations.push({
-              code: code,
-              name: name,
-              ten_min: clean(tds[0].innerText),
-              ten_min_num: toNum(tds[0].innerText),
-              one_hr: clean(tds[1].innerText),
-              one_hr_num: toNum(tds[1].innerText),
-              three_hr: clean(tds[2].innerText),
-              three_hr_num: toNum(tds[2].innerText),
-              all_hr: clean(tds[4].innerText),
-              all_hr_num: toNum(tds[4].innerText),
-              today: clean(tds[5].innerText),
-              today_num: toNum(tds[5].innerText)
-            });
-          });
-          result.rainfall = { stations: stations };
+      // 2. 直連高雄雨量 (多重代理依序嘗試)
+      const targetCwaUrl = `https://www.cwa.gov.tw/V8/C/P/Rainfall/MOD_10M/64.html?_=${cacheBust}`;
+      const proxyList = [
+        `https://corsproxy.io/?${encodeURIComponent(targetCwaUrl)}`,
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(targetCwaUrl)}`,
+        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetCwaUrl)}`
+      ];
+
+      for (const proxyUrl of proxyList) {
+        try {
+          const res = await fetch(proxyUrl, { cache: 'no-store' });
+          if (res.ok) {
+            const html = await res.text();
+            if (html && html.includes('table')) {
+              const doc = new DOMParser().parseFromString(html, 'text/html');
+              const trs = doc.querySelectorAll('tr');
+              const stations = [];
+              trs.forEach(tr => {
+                const th = tr.querySelector('th[headers="station"]');
+                if (!th) return;
+                const tds = tr.querySelectorAll('td');
+                if (tds.length < 6) return;
+                const code = th.id.replace('C640_', '');
+                const name = th.innerText.trim();
+                const clean = txt => (txt || '').replace(/[&nbsp;\s]/g, '').trim() || '0.0';
+                const toNum = txt => {
+                  const n = parseFloat(clean(txt));
+                  return isNaN(n) ? 0.0 : n;
+                };
+                stations.push({
+                  code: code,
+                  name: name,
+                  ten_min: clean(tds[0].innerText),
+                  ten_min_num: toNum(tds[0].innerText),
+                  one_hr: clean(tds[1].innerText),
+                  one_hr_num: toNum(tds[1].innerText),
+                  three_hr: clean(tds[2].innerText),
+                  three_hr_num: toNum(tds[2].innerText),
+                  all_hr: clean(tds[4].innerText),
+                  all_hr_num: toNum(tds[4].innerText),
+                  today: clean(tds[5].innerText),
+                  today_num: toNum(tds[5].innerText)
+                });
+              });
+              if (stations.length > 0) {
+                result.rainfall = { stations: stations };
+                break; // 成功解析即退出重試
+              }
+            }
+          }
+        } catch (proxyErr) {
+          console.warn(`Proxy ${proxyUrl} failed, trying next...`);
         }
-      } catch (e) {
-        console.warn('Direct rainfall fallback error:', e);
       }
 
       return result;
     }
+
 
 
     // --- 渲染 2 個小港測站雨量卡片 (鳳森 + 鳳鼻頭) ---
@@ -1041,6 +1060,16 @@
           window.open(window.location.href, 'weather_widget', 'width=520,height=920,menubar=no,toolbar=no,location=no,status=no,resizable=yes');
         });
       }
+
+      // 手機休眠喚醒或切換回分頁時立即自動更新
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          fetchData();
+        }
+      });
+      window.addEventListener('pageshow', () => {
+        fetchData();
+      });
 
       // 初始化載入並設定每 60 秒自動背景刷新
       fetchData();
