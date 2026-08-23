@@ -1,7 +1,7 @@
 {
-  "name": "高雄小港/林園 氣象即時監控",
+  "name": "高雄氣象即時監控",
   "short_name": "高雄氣象",
-  "description": "即時林園降雨雷達 (250m) 與小港雨量監控",
+  "description": "即時降雨雷達 (250m) 與全高雄雨量即時監控",
   "id": "https://erniesu8090-beep.github.io/kh-weather/",
   "start_url": "https://erniesu8090-beep.github.io/kh-weather/",
   "scope": "https://erniesu8090-beep.github.io/kh-weather/",

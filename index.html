@@ -23,7 +23,7 @@
   <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
   <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png">
   <meta name="application-name" content="高雄氣象">
-  <title>高雄小港/林園 氣象即時監控</title>
+  <title>高雄氣象即時監控 · 降雨雷達與雨量</title>
   <!-- Fonts & Lucide Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -626,7 +626,7 @@
         <div class="brand-text">
           <h1>
             高雄市氣象監控
-            <span class="tag-district">📍 小港測站</span>
+            <span class="tag-district" id="headerDistrictTag">📍 小港區</span>
           </h1>
           <p>降雨雷達 (250m) & 雨量監控</p>
         </div>
@@ -905,6 +905,40 @@
     setInterval(updateClock, 1000);
     updateClock();
 
+    // --- 動態更新頂部 Header 地區標籤 ---
+    function updateHeaderDistrictTag() {
+      const code1 = state.selectedStations[0] || 'C0V45';
+      const code2 = state.selectedStations[1] || 'C0V84';
+
+      const st1 = findStation(code1);
+      const st2 = findStation(code2);
+
+      let d1 = '', d2 = '';
+      for (const grp of KAOHSIUNG_STATIONS_GROUPS) {
+        const s1 = grp.stations.find(s => s.code === code1);
+        if (s1) d1 = s1.district;
+        const s2 = grp.stations.find(s => s.code === code2);
+        if (s2) d2 = s2.district;
+      }
+      if (!d1 && st1 && st1.region) d1 = st1.region.replace('區', '');
+      if (!d2 && st2 && st2.region) d2 = st2.region.replace('區', '');
+
+      const tag = document.getElementById('headerDistrictTag');
+      if (!tag) return;
+
+      if (d1 && d2) {
+        if (d1 === d2) {
+          tag.innerText = `📍 ${d1}區`;
+        } else {
+          tag.innerText = `📍 ${d1} · ${d2}`;
+        }
+      } else if (d1 || d2) {
+        tag.innerText = `📍 ${d1 || d2}區`;
+      } else {
+        tag.innerText = `📍 即時測站`;
+      }
+    }
+
     // --- 初始化測站下拉選單 ---
     function initStationDropdowns() {
       const selectConfigs = [
@@ -937,6 +971,8 @@
             localStorage.setItem('kh_rain_stations', JSON.stringify(state.selectedStations));
           } catch(e) {}
           
+          updateHeaderDistrictTag();
+
           if (state.stations && state.stations.length > 0) {
             renderRainfall({ stations: state.stations });
           } else {
@@ -944,6 +980,8 @@
           }
         });
       });
+
+      updateHeaderDistrictTag();
     }
 
     // --- 資料載入 ---
@@ -1180,6 +1218,7 @@
 
       fillCard('card1', st1, code1);
       fillCard('card2', st2, code2);
+      updateHeaderDistrictTag();
     }
 
     function fillCard(cardPrefix, st, targetCode) {
