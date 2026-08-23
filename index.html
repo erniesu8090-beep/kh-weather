@@ -13,6 +13,9 @@
   <meta name="apple-mobile-web-app-title" content="高雄氣象">
   <meta name="theme-color" content="#0b1120">
   <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <title>高雄小港/林園 氣象即時監控</title>
   <!-- Fonts & Lucide Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -160,7 +163,7 @@
       box-shadow: 0 0 6px var(--success);
     }
 
-    .btn-refresh, .btn-popout {
+    .btn-refresh {
       display: inline-flex;
       align-items: center;
       gap: 3px;
@@ -173,17 +176,6 @@
       border: none;
       cursor: pointer;
       transition: all 0.15s;
-    }
-
-    .btn-popout {
-      background: rgba(255, 255, 255, 0.06);
-      color: var(--text-main);
-      border: 1px solid var(--bg-card-border);
-    }
-
-    .btn-popout:hover {
-      background: #1e2942;
-      border-color: var(--primary);
     }
 
     .btn-refresh:hover {
@@ -591,10 +583,6 @@
           <i data-lucide="refresh-cw" id="iconRefresh" style="width: 13px; height: 13px;"></i>
           <span>更新</span>
         </button>
-        <button class="btn-popout" id="btnPopout" title="彈出獨立桌面小視窗">
-          <i data-lucide="external-link" style="width: 13px; height: 13px;"></i>
-          <span>小視窗</span>
-        </button>
       </div>
     </header>
 
@@ -679,7 +667,7 @@
           <button class="mode-tab-btn active" data-mode="linyuan">🎯 林園降雨雷達</button>
           <button class="mode-tab-btn" data-mode="radar_no_terrain">🌀 全臺無地形</button>
           <button class="mode-tab-btn" data-mode="radar_with_terrain">🏔️ 全臺有地形</button>
-          <button class="mode-tab-btn" data-mode="radar_national_rain">🌧️ 全臺合成</button>
+          <button class="mode-tab-btn" data-mode="satellite_taiwan">🛰️ 衛星雲圖(全台)</button>
         </div>
       </div>
 
@@ -808,12 +796,12 @@
       const result = { radar: null, rainfall: null };
       const cacheBust = Date.now();
 
-      // 1. 直連雷達 (JSONP 腳本注入，零 CORS 限制)
-      const radarPromise = new Promise((resolve) => {
-        const oldScript = document.getElementById('cwaRadarScript');
+      // 1. 直連林園降雨雷達 (JSONP 腳本注入，零 CORS 限制)
+      const radarRainPromise = new Promise((resolve) => {
+        const oldScript = document.getElementById('cwaRadarRainScript');
         if (oldScript) oldScript.remove();
         const script = document.createElement('script');
-        script.id = 'cwaRadarScript';
+        script.id = 'cwaRadarRainScript';
         script.src = `https://www.cwa.gov.tw/Data/js/obs_img/Observe_radar_rain.js?_=${cacheBust}`;
         script.onload = () => {
           if (window.RadarRainImg && window.RadarRainImg.Area2) {
@@ -821,7 +809,9 @@
               url: `https://www.cwa.gov.tw/Data/radar_rain/${i.img}?_=${cacheBust}`,
               time: i.text
             }));
-            result.radar = { areas: { Area2: { scans_hd: scans } } };
+            if (!result.radar) result.radar = {};
+            if (!result.radar.areas) result.radar.areas = {};
+            result.radar.areas.Area2 = { scans_hd: scans };
           }
           resolve();
         };
@@ -829,7 +819,36 @@
         document.body.appendChild(script);
       });
 
-      // 2. 直連高雄雨量 (使用氣象署官方 OpenData API，完全支援瀏覽器跨網域 CORS)
+      // 2. 直連全臺雷達 (無地形與有地形，JSONP 腳本注入)
+      const radarPromise = new Promise((resolve) => {
+        const oldScript = document.getElementById('cwaRadarScript');
+        if (oldScript) oldScript.remove();
+        const script = document.createElement('script');
+        script.id = 'cwaRadarScript';
+        script.src = `https://www.cwa.gov.tw/Data/js/obs_img/Observe_radar.js?_=${cacheBust}`;
+        script.onload = () => {
+          try {
+            if (window.RadarImg && window.RadarImg.Tab0) {
+              const noT = Object.values(window.RadarImg.Tab0.Area0?.size0 || {}).map(i => ({
+                url: `https://www.cwa.gov.tw/Data/radar/${i.img}?_=${cacheBust}`,
+                time: i.text
+              }));
+              const withT = Object.values(window.RadarImg.Tab0.Area1?.size0 || {}).map(i => ({
+                url: `https://www.cwa.gov.tw/Data/radar/${i.img}?_=${cacheBust}`,
+                time: i.text
+              }));
+              if (!result.radar) result.radar = {};
+              result.radar.no_terrain_scans = noT;
+              result.radar.with_terrain_scans = withT;
+            }
+          } catch (e) {}
+          resolve();
+        };
+        script.onerror = () => resolve();
+        document.body.appendChild(script);
+      });
+
+      // 3. 直連高雄雨量 (使用氣象署官方 OpenData API，完全支援瀏覽器跨網域 CORS)
       const rainfallPromise = (async () => {
         try {
           const cwaUrl = `https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0002-001?Authorization=${CWA_API_KEY}&StationId=C0V450,C0V840&_=${cacheBust}`;
@@ -874,7 +893,32 @@
         }
       })();
 
-      await Promise.all([radarPromise, rainfallPromise]);
+      // 4. 直連全臺衛星雲圖 (JSONP 腳本注入)
+      const satPromise = new Promise((resolve) => {
+        const oldScript = document.getElementById('cwaSatScript');
+        if (oldScript) oldScript.remove();
+        const script = document.createElement('script');
+        script.id = 'cwaSatScript';
+        script.src = `https://www.cwa.gov.tw/Data/js/obs_img/Observe_sat.js?_=${cacheBust}`;
+        script.onload = () => {
+          try {
+            if (window.SatImg && window.SatImg.Tab1 && window.SatImg.Tab1.Area1) {
+              const raw = window.SatImg.Tab1.Area1.size0?.C || window.SatImg.Tab1.Area1.size1?.C || {};
+              const scans = Object.values(raw).map(i => ({
+                url: `https://www.cwa.gov.tw/Data/satellite/${i.img}?_=${cacheBust}`,
+                time: i.text
+              }));
+              if (!result.radar) result.radar = {};
+              result.radar.satellite_scans = scans;
+            }
+          } catch (e) {}
+          resolve();
+        };
+        script.onerror = () => resolve();
+        document.body.appendChild(script);
+      });
+
+      await Promise.all([radarRainPromise, radarPromise, rainfallPromise, satPromise]);
       return result;
     }
 
@@ -939,14 +983,50 @@
         state.radarScans = all.slice(0, count).reverse();
         state.activeIndex = state.radarScans.length - 1;
       } else if (state.radarMode === 'radar_no_terrain') {
-        state.radarScans = [{ url: 'https://www.cwa.gov.tw/Data/radar/CV1_3600.png?_=' + Date.now(), time: '全臺無地形雷達' }];
-        state.activeIndex = 0;
+        const all = (data.no_terrain_scans && data.no_terrain_scans.length > 0) ? data.no_terrain_scans : [];
+        if (all.length > 0) {
+          let count = all.length;
+          if (state.hoursFilter === 0.5) count = Math.min(3, all.length);
+          else if (state.hoursFilter === 1) count = Math.min(6, all.length);
+          else if (state.hoursFilter === 2) count = Math.min(12, all.length);
+          else if (state.hoursFilter === 3) count = Math.min(18, all.length);
+
+          state.radarScans = all.slice(0, count).reverse();
+          state.activeIndex = state.radarScans.length - 1;
+        } else {
+          state.radarScans = [{ url: 'https://www.cwa.gov.tw/Data/radar/CV1_3600.png?_=' + Date.now(), time: '全臺無地形雷達' }];
+          state.activeIndex = 0;
+        }
       } else if (state.radarMode === 'radar_with_terrain') {
-        state.radarScans = [{ url: 'https://www.cwa.gov.tw/Data/radar/CV1_TW_3600.png?_=' + Date.now(), time: '全臺有地形雷達' }];
-        state.activeIndex = 0;
-      } else if (state.radarMode === 'radar_national_rain') {
-        state.radarScans = [{ url: 'https://www.cwa.gov.tw/Data/radar_rain/CV1_RCSL_1000/CV1_RCSL_1000.png?_=' + Date.now(), time: '全臺降雨雷達合成' }];
-        state.activeIndex = 0;
+        const all = (data.with_terrain_scans && data.with_terrain_scans.length > 0) ? data.with_terrain_scans : [];
+        if (all.length > 0) {
+          let count = all.length;
+          if (state.hoursFilter === 0.5) count = Math.min(3, all.length);
+          else if (state.hoursFilter === 1) count = Math.min(6, all.length);
+          else if (state.hoursFilter === 2) count = Math.min(12, all.length);
+          else if (state.hoursFilter === 3) count = Math.min(18, all.length);
+
+          state.radarScans = all.slice(0, count).reverse();
+          state.activeIndex = state.radarScans.length - 1;
+        } else {
+          state.radarScans = [{ url: 'https://www.cwa.gov.tw/Data/radar/CV1_TW_3600.png?_=' + Date.now(), time: '全臺有地形雷達' }];
+          state.activeIndex = 0;
+        }
+      } else if (state.radarMode === 'satellite_taiwan') {
+        const all = (data.satellite_scans && data.satellite_scans.length > 0) ? data.satellite_scans : [];
+        if (all.length > 0) {
+          let count = all.length;
+          if (state.hoursFilter === 0.5) count = Math.min(3, all.length);
+          else if (state.hoursFilter === 1) count = Math.min(6, all.length);
+          else if (state.hoursFilter === 2) count = Math.min(12, all.length);
+          else if (state.hoursFilter === 3) count = Math.min(18, all.length);
+
+          state.radarScans = all.slice(0, count).reverse();
+          state.activeIndex = state.radarScans.length - 1;
+        } else {
+          state.radarScans = [{ url: 'https://www.cwa.gov.tw/Data/satellite/LCC_IR1_CR_2750/LCC_IR1_CR_2750.jpg?_=' + Date.now(), time: '全臺衛星雲圖 (色調強化)' }];
+          state.activeIndex = 0;
+        }
       }
 
       const slider = document.getElementById('radarSlider');
@@ -1028,7 +1108,8 @@
           if (state.radarMode === 'linyuan') badge.innerText = '林園降雨雷達 (250m解析度)';
           else if (state.radarMode === 'radar_no_terrain') badge.innerText = '全臺雷達 (無地形)';
           else if (state.radarMode === 'radar_with_terrain') badge.innerText = '全臺雷達 (有地形)';
-          else badge.innerText = '全臺降雨雷達合成';
+          else if (state.radarMode === 'satellite_taiwan') badge.innerText = '衛星雲圖 (全臺彩色色調強化)';
+          else badge.innerText = '即時影像觀測';
 
           fetchData();
         });
@@ -1043,14 +1124,6 @@
           fetchData();
         });
       });
-
-      // 彈出獨立桌面小視窗按鈕
-      const popBtn = document.getElementById('btnPopout');
-      if (popBtn) {
-        popBtn.addEventListener('click', () => {
-          window.open(window.location.href, 'weather_widget', 'width=520,height=920,menubar=no,toolbar=no,location=no,status=no,resizable=yes');
-        });
-      }
 
       // 手機休眠喚醒或切換回分頁時立即自動更新
       document.addEventListener('visibilitychange', () => {

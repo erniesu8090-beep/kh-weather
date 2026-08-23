@@ -203,6 +203,50 @@ class CWADataFetcher:
                 'latest_sd': scans_1000[0] if scans_1000 else None,
             }
 
+        # 解析全臺無地形與有地形雷達 (Observe_radar.js: CV1_3600 & CV1_TW_3600)
+        no_terrain_scans = []
+        with_terrain_scans = []
+        try:
+            rad_url = f"https://www.cwa.gov.tw/Data/js/obs_img/Observe_radar.js?_={int(now * 1000)}"
+            rad_req = urllib.request.Request(rad_url, headers=cls.get_headers())
+            with urllib.request.urlopen(rad_req, timeout=8) as rad_resp:
+                rad_js = rad_resp.read().decode('utf-8', errors='ignore')
+                no_t_entries = re.findall(r"\{\s*\"img\":'(CV1_3600_[^']+)',\s*'text':'([^']+)'\}", rad_js)
+                for img_rel, t_str in no_t_entries:
+                    no_terrain_scans.append({
+                        'url': f"https://www.cwa.gov.tw/Data/radar/{img_rel}",
+                        'filename': img_rel,
+                        'time': t_str
+                    })
+                with_t_entries = re.findall(r"\{\s*\"img\":'(CV1_TW_3600_[^']+)',\s*'text':'([^']+)'\}", rad_js)
+                for img_rel, t_str in with_t_entries:
+                    with_terrain_scans.append({
+                        'url': f"https://www.cwa.gov.tw/Data/radar/{img_rel}",
+                        'filename': img_rel,
+                        'time': t_str
+                    })
+        except Exception:
+            pass
+
+        # 解析全臺衛星雲圖 (臺灣彩色色調強化 LCC_IR1_CR_2750 / LCC_IR1_CR_1000)
+        satellite_scans = []
+        try:
+            sat_url = f"https://www.cwa.gov.tw/Data/js/obs_img/Observe_sat.js?_={int(now * 1000)}"
+            sat_req = urllib.request.Request(sat_url, headers=cls.get_headers())
+            with urllib.request.urlopen(sat_req, timeout=8) as sat_resp:
+                sat_js = sat_resp.read().decode('utf-8', errors='ignore')
+                entries = re.findall(r"\{\s*\"img\":'(LCC_IR1_CR_2750/[^']+)',\s*'text':'([^']+)'\}", sat_js)
+                if not entries:
+                    entries = re.findall(r"\{\s*\"img\":'(LCC_IR1_CR_1000/[^']+)',\s*'text':'([^']+)'\}", sat_js)
+                for img_rel, t_str in entries:
+                    satellite_scans.append({
+                        'url': f"https://www.cwa.gov.tw/Data/satellite/{img_rel}",
+                        'filename': img_rel,
+                        'time': t_str
+                    })
+        except Exception:
+            pass
+
         result = {
             'fetch_time': time.strftime('%Y-%m-%d %H:%M:%S'),
             'areas': areas,
@@ -210,7 +254,10 @@ class CWADataFetcher:
                 'no_terrain': 'https://www.cwa.gov.tw/Data/radar/CV1_3600.png',
                 'with_terrain': 'https://www.cwa.gov.tw/Data/radar/CV1_TW_3600.png',
                 'rain_radar': 'https://www.cwa.gov.tw/Data/radar_rain/CV1_RCSL_1000/CV1_RCSL_1000.png'
-            }
+            },
+            'no_terrain_scans': no_terrain_scans,
+            'with_terrain_scans': with_terrain_scans,
+            'satellite_scans': satellite_scans
         }
         cls._cache['radar'] = {'time': now, 'data': result}
         return result
