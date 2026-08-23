@@ -217,25 +217,74 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 2px;
+      gap: 4px;
+      margin-bottom: 3px;
     }
 
-    .kpi-title {
-      font-size: 0.84rem;
-      font-weight: 800;
+    .station-select-wrapper {
       display: flex;
       align-items: center;
       gap: 4px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .station-select {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-main);
+      border: 1px solid var(--bg-card-border);
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 800;
+      font-family: inherit;
+      padding: 2px 18px 2px 6px;
+      outline: none;
+      cursor: pointer;
+      width: auto;
+      max-width: 125px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2338bdf8' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 4px center;
+      transition: all 0.15s ease;
+    }
+
+    .station-select:hover {
+      border-color: var(--primary);
+      background-color: rgba(56, 189, 248, 0.12);
+    }
+
+    .station-select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
+    }
+
+    .station-select option {
+      background: #0f172a;
+      color: #f1f5f9;
+      font-weight: 600;
+    }
+
+    .station-select optgroup {
+      background: #0b1120;
+      color: var(--primary);
+      font-weight: 700;
+      font-style: normal;
     }
 
     .code-badge {
-      font-size: 0.62rem;
+      font-size: 0.6rem;
       font-family: var(--font-mono);
       padding: 1px 4px;
       border-radius: 4px;
       background: rgba(255, 255, 255, 0.06);
       border: 1px solid var(--bg-card-border);
       color: var(--text-muted);
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
     .rain-status-badge {
@@ -246,6 +295,8 @@
       background: rgba(56, 189, 248, 0.15);
       color: var(--primary);
       border: 1px solid rgba(56, 189, 248, 0.3);
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
     .kpi-val-row {
@@ -593,70 +644,74 @@
       </div>
     </header>
 
-    <!-- 2 個小港核心監測點：鳳森 + 鳳鼻頭 -->
+    <!-- 2 個即時雨量觀測站點 (支援自訂切換，預設小港鳳森 + 鳳鼻頭) -->
     <div class="kpi-grid">
-      <!-- 1. 鳳森測站 (小港區) -->
-      <div class="kpi-card linyuan">
+      <!-- 1. 測站 1 -->
+      <div class="kpi-card linyuan" id="card1">
         <div class="kpi-header">
-          <div class="kpi-title">
-            <span>鳳森測站</span>
-            <span class="code-badge">C0V45 · 小港</span>
+          <div class="station-select-wrapper">
+            <select class="station-select" id="stationSelect1" title="點擊切換測站 1">
+              <option value="C0V45" selected>鳳森 (小港)</option>
+            </select>
+            <span class="code-badge" id="card1Code">C0V45 · 小港</span>
           </div>
-          <span class="rain-status-badge" id="fsStatus">無雨</span>
+          <span class="rain-status-badge" id="card1Status">無雨</span>
         </div>
         <div class="kpi-val-row">
-          <div class="kpi-num" id="fs10m">0.0</div>
+          <div class="kpi-num" id="card1_10m">0.0</div>
           <div class="kpi-unit">mm / 10分鐘</div>
         </div>
         <div class="kpi-sub-grid">
           <div class="sub-stat-item">
             <span class="sub-stat-label">1小時</span>
-            <span class="sub-stat-val" id="fs1h">0.0 mm</span>
+            <span class="sub-stat-val" id="card1_1h">0.0 mm</span>
           </div>
           <div class="sub-stat-item">
             <span class="sub-stat-label">3小時</span>
-            <span class="sub-stat-val" id="fs3h">0.0 mm</span>
+            <span class="sub-stat-val" id="card1_3h">0.0 mm</span>
           </div>
           <div class="sub-stat-item">
             <span class="sub-stat-label">24小時</span>
-            <span class="sub-stat-val" id="fs24h">0.0 mm</span>
+            <span class="sub-stat-val" id="card1_24h">0.0 mm</span>
           </div>
           <div class="sub-stat-item">
             <span class="sub-stat-label">本日累積</span>
-            <span class="sub-stat-val highlight" id="fsToday">0.0 mm</span>
+            <span class="sub-stat-val highlight" id="card1Today">0.0 mm</span>
           </div>
         </div>
       </div>
 
-      <!-- 2. 鳳鼻頭測站 (小港區) -->
-      <div class="kpi-card linyuan">
+      <!-- 2. 測站 2 -->
+      <div class="kpi-card linyuan" id="card2">
         <div class="kpi-header">
-          <div class="kpi-title">
-            <span>鳳鼻頭測站</span>
-            <span class="code-badge">C0V84 · 小港</span>
+          <div class="station-select-wrapper">
+            <select class="station-select" id="stationSelect2" title="點擊切換測站 2">
+              <option value="C0V84" selected>鳳鼻頭 (小港)</option>
+            </select>
+            <span class="code-badge" id="card2Code">C0V84 · 小港</span>
           </div>
-          <span class="rain-status-badge" id="fbtStatus">無雨</span>
+          <span class="rain-status-badge" id="card2Status">無雨</span>
         </div>
         <div class="kpi-val-row">
-          <div class="kpi-num" id="fbt10m">0.0</div>
+          <div class="kpi-num" id="card2_10m">0.0</div>
           <div class="kpi-unit">mm / 10分鐘</div>
         </div>
         <div class="kpi-sub-grid">
           <div class="sub-stat-item">
             <span class="sub-stat-label">1小時</span>
-            <span class="sub-stat-val" id="fbt1h">0.0 mm</span>
+            <span class="sub-stat-val" id="card2_1h">0.0 mm</span>
           </div>
           <div class="sub-stat-item">
             <span class="sub-stat-label">3小時</span>
-            <span class="sub-stat-val" id="fbt3h">0.0 mm</span>
+            <span class="sub-stat-val" id="card2_3h">0.0 mm</span>
           </div>
           <div class="sub-stat-item">
             <span class="sub-stat-label">24小時</span>
-            <span class="sub-stat-val" id="fbt24h">0.0 mm</span>
+            <span class="sub-stat-val" id="card2_24h">0.0 mm</span>
           </div>
           <div class="sub-stat-item">
             <span class="sub-stat-label">本日累積</span>
-            <span class="sub-stat-val highlight" id="fbtToday">0.0 mm</span>
+            <span class="sub-stat-val highlight" id="card2Today">0.0 mm</span>
           </div>
         </div>
       </div>
@@ -741,6 +796,94 @@
   </div>
 
   <script>
+    // --- 完整高雄觀測站分區列表 (預設小港區鳳森與鳳鼻頭) ---
+    const KAOHSIUNG_STATIONS_GROUPS = [
+      {
+        group: "📍 小港區 (預設核心)",
+        stations: [
+          { code: "C0V45", name: "鳳森", district: "小港" },
+          { code: "C0V84", name: "鳳鼻頭", district: "小港" }
+        ]
+      },
+      {
+        group: "🏙️ 高雄市區測站",
+        stations: [
+          { code: "C0V44", name: "鳳山", district: "鳳山" },
+          { code: "G2P82", name: "農試鳳山分所", district: "鳳山" },
+          { code: "C0V89", name: "前鎮", district: "前鎮" },
+          { code: "C0V71", name: "苓雅", district: "苓雅" },
+          { code: "C0V49", name: "新興", district: "新興" },
+          { code: "C0V70", name: "三民", district: "三民" },
+          { code: "C0V69", name: "鼓山", district: "鼓山" },
+          { code: "C0V81", name: "左營", district: "左營" },
+          { code: "46744", name: "高雄", district: "楠梓" },
+          { code: "CAP07", name: "高雄燈塔", district: "旗津" }
+        ]
+      },
+      {
+        group: "🏭 林園 / 大寮 / 大樹 / 仁武 / 大社",
+        stations: [
+          { code: "C0V72", name: "林園", district: "林園" },
+          { code: "C0V90", name: "汕尾", district: "林園" },
+          { code: "C0V73", name: "大寮", district: "大寮" },
+          { code: "C0V91", name: "大樹", district: "大樹" },
+          { code: "C0V35", name: "溪埔", district: "大樹" },
+          { code: "C0V68", name: "仁武", district: "仁武" },
+          { code: "C0V77", name: "大社", district: "大社" }
+        ]
+      },
+      {
+        group: "🌾 北高雄 (岡山/橋頭/梓官/路竹/彌陀等)",
+        stations: [
+          { code: "C0V66", name: "岡山", district: "岡山" },
+          { code: "C0V76", name: "橋頭", district: "橋頭" },
+          { code: "C0V61", name: "梓官", district: "梓官" },
+          { code: "C0V85", name: "蚵仔寮", district: "梓官" },
+          { code: "C0V65", name: "彌陀", district: "彌陀" },
+          { code: "C0V86", name: "南寮", district: "彌陀" },
+          { code: "C0V87", name: "文安", district: "彌陀" },
+          { code: "C0V62", name: "永安", district: "永安" },
+          { code: "C0V63", name: "茄萣", district: "茄萣" },
+          { code: "C0V88", name: "興達", district: "茄萣" },
+          { code: "C0V75", name: "路竹", district: "路竹" },
+          { code: "C0V53", name: "阿蓮", district: "阿蓮" },
+          { code: "C0V40", name: "阿公店", district: "燕巢" },
+          { code: "C1V39", name: "尖山", district: "燕巢" },
+          { code: "01P28", name: "水利署古亭坑", district: "田寮" }
+        ]
+      },
+      {
+        group: "⛰️ 東高雄山區 (旗山/美濃/六龜/甲仙/桃源等)",
+        stations: [
+          { code: "C0V74", name: "旗山", district: "旗山" },
+          { code: "C2V31", name: "美濃", district: "美濃" },
+          { code: "C2V57", name: "吉東", district: "美濃" },
+          { code: "C0V36", name: "內門", district: "內門" },
+          { code: "C2V58", name: "瑞山", district: "內門" },
+          { code: "88V56", name: "集來", district: "杉林" },
+          { code: "C0V80", name: "六龜", district: "六龜" },
+          { code: "C1V59", name: "新發", district: "六龜" },
+          { code: "C1V34", name: "大津", district: "六龜" },
+          { code: "C2V25", name: "甲仙", district: "甲仙" },
+          { code: "C0V82", name: "小林", district: "甲仙" },
+          { code: "C0V79", name: "萬山", district: "茂林" },
+          { code: "81V96", name: "茂林國小", district: "茂林" },
+          { code: "C0V21", name: "復興", district: "桃源" },
+          { code: "C0V93", name: "天池", district: "桃源" },
+          { code: "C1V60", name: "藤枝", district: "桃源" },
+          { code: "81V83", name: "那瑪夏國中", district: "那瑪夏" }
+        ]
+      }
+    ];
+
+    const savedStations = (() => {
+      try {
+        const stored = JSON.parse(localStorage.getItem('kh_rain_stations'));
+        if (Array.isArray(stored) && stored.length >= 2) return stored.slice(0, 2);
+      } catch (e) {}
+      return ['C0V45', 'C0V84'];
+    })();
+
     // --- 應用狀態 ---
     const state = {
       radarMode: 'linyuan',
@@ -749,7 +892,8 @@
       isPlaying: false,
       timer: null,
       hoursFilter: 1,
-      stations: []
+      stations: [],
+      selectedStations: savedStations
     };
 
     // --- 即時時鐘 ---
@@ -760,6 +904,47 @@
     }
     setInterval(updateClock, 1000);
     updateClock();
+
+    // --- 初始化測站下拉選單 ---
+    function initStationDropdowns() {
+      const selectConfigs = [
+        { id: 'stationSelect1', defaultVal: state.selectedStations[0] || 'C0V45', index: 0 },
+        { id: 'stationSelect2', defaultVal: state.selectedStations[1] || 'C0V84', index: 1 }
+      ];
+
+      selectConfigs.forEach(({ id, defaultVal, index }) => {
+        const sel = document.getElementById(id);
+        if (!sel) return;
+        sel.innerHTML = '';
+
+        KAOHSIUNG_STATIONS_GROUPS.forEach(grp => {
+          const optgrp = document.createElement('optgroup');
+          optgrp.label = grp.group;
+          grp.stations.forEach(st => {
+            const opt = document.createElement('option');
+            opt.value = st.code;
+            opt.textContent = `${st.name} (${st.district})`;
+            optgrp.appendChild(opt);
+          });
+          sel.appendChild(optgrp);
+        });
+
+        sel.value = defaultVal;
+
+        sel.addEventListener('change', () => {
+          state.selectedStations[index] = sel.value;
+          try {
+            localStorage.setItem('kh_rain_stations', JSON.stringify(state.selectedStations));
+          } catch(e) {}
+          
+          if (state.stations && state.stations.length > 0) {
+            renderRainfall({ stations: state.stations });
+          } else {
+            fetchData();
+          }
+        });
+      });
+    }
 
     // --- 資料載入 ---
     async function fetchData() {
@@ -858,25 +1043,39 @@
       // 3. 直連高雄雨量 (使用氣象署官方 OpenData API，完全支援瀏覽器跨網域 CORS)
       const rainfallPromise = (async () => {
         try {
-          const cwaUrl = `https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0002-001?Authorization=${CWA_API_KEY}&StationId=C0V450,C0V840&_=${cacheBust}`;
+          const cwaUrl = `https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0002-001?Authorization=${CWA_API_KEY}&_=${cacheBust}`;
           const res = await fetch(cwaUrl);
           if (res.ok) {
             const data = await res.json();
-            const stationsData = data?.records?.Station || [];
+            const allStations = data?.records?.Station || [];
             const cleanNum = v => {
               const n = parseFloat(v);
               return isNaN(n) || n < 0 ? 0.0 : n;
             };
-            const stations = stationsData.map(st => {
+            const khStations = allStations.filter(st => {
+              const county = st.GeoInfo?.CountyName || '';
+              return county.includes('高雄') || (st.StationId && (
+                st.StationId.startsWith('C0V') || st.StationId.startsWith('C1V') || 
+                st.StationId.startsWith('C2V') || st.StationId.startsWith('CAP') || 
+                st.StationId.startsWith('46744') || st.StationId.startsWith('G2P') || 
+                st.StationId.startsWith('01P') || st.StationId.startsWith('81V') || 
+                st.StationId.startsWith('88V') || st.StationId.startsWith('O1V') || 
+                st.StationId.startsWith('F1V') || st.StationId.startsWith('E2P')
+              ));
+            });
+            const stations = khStations.map(st => {
               const rf = st.RainfallElement || {};
               const ten_min = rf.Past10Min?.Precipitation ?? '-';
               const one_hr = rf.Past1hr?.Precipitation ?? '-';
               const three_hr = rf.Past3hr?.Precipitation ?? '-';
               const all_hr = rf.Past24hr?.Precipitation ?? '-';
               const today = rf.Now?.Precipitation ?? '-';
+              const town = st.GeoInfo?.TownName || '';
               return {
                 code: st.StationId ? st.StationId.replace(/0$/, '') : '',
+                fullCode: st.StationId || '',
                 name: st.StationName || '',
+                region: town ? `${town}區` : '',
                 ten_min: String(ten_min),
                 ten_min_num: cleanNum(ten_min),
                 one_hr: String(one_hr),
@@ -929,49 +1128,116 @@
       return result;
     }
 
-    // --- 渲染 2 個小港測站雨量卡片 (鳳森 + 鳳鼻頭) ---
+    // --- 測站搜尋匹配 ---
+    function findStation(code) {
+      if (!code) return null;
+      const cleanTarget = code.replace(/0$/, '').toUpperCase();
+      
+      // 1. 從已下載的即時雨量資料中找
+      if (state.stations && state.stations.length > 0) {
+        const found = state.stations.find(s => {
+          const sCode = (s.code || '').replace(/0$/, '').toUpperCase();
+          const sFull = (s.fullCode || '').toUpperCase();
+          return sCode === cleanTarget || s.code === code || sFull === cleanTarget;
+        });
+        if (found) return found;
+      }
+
+      // 2. 備援預設資訊
+      for (const grp of KAOHSIUNG_STATIONS_GROUPS) {
+        const st = grp.stations.find(s => s.code === code);
+        if (st) {
+          return {
+            code: st.code,
+            name: st.name,
+            region: `${st.district}區`,
+            ten_min: '0.0',
+            ten_min_num: 0,
+            one_hr: '0.0',
+            one_hr_num: 0,
+            three_hr: '0.0',
+            three_hr_num: 0,
+            all_hr: '0.0',
+            all_hr_num: 0,
+            today: '0.0',
+            today_num: 0
+          };
+        }
+      }
+      return null;
+    }
+
+    // --- 渲染 2 個自選測站雨量卡片 ---
     function renderRainfall(data) {
       if (!data || !data.stations) return;
       state.stations = data.stations;
 
-      const fs = data.stations.find(s => s.code === 'C0V45' || s.code === 'C0V450' || (s.name && s.name.includes('鳳森'))) || {};
-      const fbt = data.stations.find(s => s.code === 'C0V84' || s.code === 'C0V840' || (s.name && s.name.includes('鳳鼻頭'))) || {};
+      const code1 = state.selectedStations[0] || 'C0V45';
+      const code2 = state.selectedStations[1] || 'C0V84';
 
-      fillCard('fs', fs);
-      fillCard('fbt', fbt);
+      const st1 = findStation(code1);
+      const st2 = findStation(code2);
+
+      fillCard('card1', st1, code1);
+      fillCard('card2', st2, code2);
     }
 
-    function fillCard(prefix, st) {
-      const tenMin = st.ten_min || '0.0';
-      const el10m = document.getElementById(`${prefix}10m`);
+    function fillCard(cardPrefix, st, targetCode) {
+      let district = '';
+      for (const grp of KAOHSIUNG_STATIONS_GROUPS) {
+        const found = grp.stations.find(s => s.code === targetCode);
+        if (found) {
+          district = found.district;
+          break;
+        }
+      }
+      if (!district && st && st.region) {
+        district = st.region.replace('區', '');
+      }
+
+      const codeBadge = document.getElementById(`${cardPrefix}Code`);
+      if (codeBadge) {
+        codeBadge.innerText = `${targetCode} · ${district || '測站'}`;
+      }
+
+      const tenMin = (st && st.ten_min !== undefined) ? st.ten_min : '0.0';
+      const el10m = document.getElementById(`${cardPrefix}_10m`);
       if (el10m) el10m.innerText = tenMin;
-      const el1h = document.getElementById(`${prefix}1h`);
-      if (el1h) el1h.innerText = (st.one_hr || '0.0') + ' mm';
-      const el3h = document.getElementById(`${prefix}3h`);
-      if (el3h) el3h.innerText = (st.three_hr || '0.0') + ' mm';
-      const el24h = document.getElementById(`${prefix}24h`);
-      if (el24h) el24h.innerText = (st.all_hr || '0.0') + ' mm';
-      const elToday = document.getElementById(`${prefix}Today`);
-      if (elToday) elToday.innerText = (st.today || '0.0') + ' mm';
 
-      const badge = document.getElementById(`${prefix}Status`);
+      const el1h = document.getElementById(`${cardPrefix}_1h`);
+      if (el1h) el1h.innerText = ((st && st.one_hr !== undefined) ? st.one_hr : '0.0') + ' mm';
 
-      if (st.ten_min_num >= 10 || st.one_hr_num >= 40) {
-        badge.innerText = '豪大雨';
-        badge.style.color = 'var(--danger)';
-        badge.style.borderColor = 'var(--danger)';
-      } else if (st.ten_min_num >= 3 || st.one_hr_num >= 15) {
-        badge.innerText = '大雨';
-        badge.style.color = 'var(--warning)';
-        badge.style.borderColor = 'var(--warning)';
-      } else if (st.ten_min_num > 0 || st.one_hr_num > 0) {
-        badge.innerText = '降雨中';
-        badge.style.color = 'var(--primary)';
-        badge.style.borderColor = 'var(--primary)';
-      } else {
-        badge.innerText = '無雨';
-        badge.style.color = 'var(--text-muted)';
-        badge.style.borderColor = 'var(--bg-card-border)';
+      const el3h = document.getElementById(`${cardPrefix}_3h`);
+      if (el3h) el3h.innerText = ((st && st.three_hr !== undefined) ? st.three_hr : '0.0') + ' mm';
+
+      const el24h = document.getElementById(`${cardPrefix}_24h`);
+      if (el24h) el24h.innerText = ((st && st.all_hr !== undefined) ? st.all_hr : '0.0') + ' mm';
+
+      const elToday = document.getElementById(`${cardPrefix}Today`);
+      if (elToday) elToday.innerText = ((st && st.today !== undefined) ? st.today : '0.0') + ' mm';
+
+      const badge = document.getElementById(`${cardPrefix}Status`);
+      if (badge) {
+        const ten_num = (st && st.ten_min_num) || 0;
+        const one_num = (st && st.one_hr_num) || 0;
+
+        if (ten_num >= 10 || one_num >= 40) {
+          badge.innerText = '豪大雨';
+          badge.style.color = 'var(--danger)';
+          badge.style.borderColor = 'var(--danger)';
+        } else if (ten_num >= 3 || one_num >= 15) {
+          badge.innerText = '大雨';
+          badge.style.color = 'var(--warning)';
+          badge.style.borderColor = 'var(--warning)';
+        } else if (ten_num > 0 || one_num > 0) {
+          badge.innerText = '降雨中';
+          badge.style.color = 'var(--primary)';
+          badge.style.borderColor = 'var(--primary)';
+        } else {
+          badge.innerText = '無雨';
+          badge.style.color = 'var(--text-muted)';
+          badge.style.borderColor = 'var(--bg-card-border)';
+        }
       }
     }
 
@@ -1141,6 +1407,9 @@
       window.addEventListener('pageshow', () => {
         fetchData();
       });
+
+      // 初始化測站下拉選單
+      initStationDropdowns();
 
       // 初始化載入並設定每 60 秒自動背景刷新
       fetchData();
