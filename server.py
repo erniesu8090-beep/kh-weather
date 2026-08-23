@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-高雄林園區雷達回波與即時雨量監控伺服器
+高雄氣象雷達回波與即時雨量監控伺服器
 提供本地 Web 服務與中央氣象署 (CWA) 資料代理轉發 (無須任何第三方套件，純 Python 標準函式庫)
 """
 
@@ -27,7 +27,7 @@ if hasattr(sys.stderr, 'reconfigure'):
 if os.name == 'nt':
     try:
         import ctypes
-        ctypes.windll.kernel32.SetConsoleTitleW("高雄林園區雷達回波 與 雨量即時監控系統")
+        ctypes.windll.kernel32.SetConsoleTitleW("高雄氣象雷達回波 與 雨量即時監控系統")
     except Exception:
         pass
 
@@ -343,7 +343,7 @@ def start_native_window(url):
         import webview
         # 建立原生獨立桌面視窗 (寬 540 x 高 950)
         window = webview.create_window(
-            title='高雄氣象即時監控 · 小港/林園',
+            title='高雄氣象即時監控 · 降雨雷達與雨量',
             url=url,
             width=540,
             height=950,
@@ -384,7 +384,7 @@ def main():
         httpd, active_port = create_server(start_port=start_port)
         url = f"http://localhost:{active_port}"
         print("=" * 64)
-        print("  高雄林園/小港 雷達回波 與 雨量即時監控系統 (原生桌面版)")
+        print("  高雄氣象雷達回波 與 雨量即時監控系統 (原生桌面版)")
         print(f"  伺服器已成功啟動: {url}")
         if active_port != start_port:
             print(f"  (原預設 Port {start_port} 被佔用，已自動切換至 Port {active_port})")
