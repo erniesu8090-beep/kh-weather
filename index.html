@@ -14,8 +14,13 @@
   <meta name="theme-color" content="#0b1120">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="shortcut icon" href="favicon.ico">
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
+  <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png">
   <title>高雄小港/林園 氣象即時監控</title>
   <!-- Fonts & Lucide Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1138,6 +1143,13 @@
       // 初始化載入並設定每 60 秒自動背景刷新
       fetchData();
       setInterval(fetchData, 60000);
+
+      // 註冊 PWA Service Worker (支援手機安裝專屬 App 與高清圖示)
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js').catch(err => {
+          console.log('SW reg error:', err);
+        });
+      }
     });
   </script>
 </body>
