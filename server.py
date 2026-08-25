@@ -55,85 +55,143 @@ class CWADataFetcher:
         if cls._cache['rainfall']['data'] and (now - cls._cache['rainfall']['time'] < cls.CACHE_DURATION):
             return cls._cache['rainfall']['data']
 
+        def parse_float(val):
+            try:
+                if val is None:
+                    return 0.0
+                v = str(val).replace(',', '').strip()
+                if v in ('-', 'X', '', 'None', 'null'):
+                    return 0.0
+                return float(v)
+            except Exception:
+                return 0.0
+
+        datatime = ""
+        gentime = ""
+        stations = []
+
+        # 1. 優先嘗試爬取 CWA 網頁 HTML 表格
         url = f"https://www.cwa.gov.tw/V8/C/P/Rainfall/MOD_10M/64.html?ID={int(now * 1000)}"
         req = urllib.request.Request(url, headers=cls.get_headers())
         try:
-            with urllib.request.urlopen(req, timeout=10) as resp:
+            with urllib.request.urlopen(req, timeout=8) as resp:
                 html = resp.read().decode('utf-8', errors='ignore')
+
+            m_time = re.search(r"data-time='([^']+)'", html)
+            if m_time:
+                datatime = m_time.group(1)
+            m_gentime = re.search(r"data-gentime='([^']+)'", html)
+            if m_gentime:
+                gentime = m_gentime.group(1)
+
+            trs = re.findall(r'<tr[^>]*>.*?</tr>', html, re.DOTALL)
+            for tr in trs:
+                name_match = re.search(r'<span[^>]*title=[\'"]([^\'"]+)[\'"]>([^<]+)<br>\(([^)]+)\)</span>', tr)
+                if not name_match:
+                    continue
+                info = name_match.group(1).strip()
+                name = name_match.group(2).strip()
+                code = name_match.group(3).strip()
+
+                region_match = re.search(r'<td headers="region"[^>]*>([^<]+)</td>', tr)
+                region = region_match.group(1).strip() if region_match else ""
+
+                def extract_val(header):
+                    m = re.search(rf'<td headers="{header}"[^>]*>(?:<span[^>]*>)?([^<]+)(?:</span>)?</td>', tr)
+                    return m.group(1).strip() if m else "-"
+
+                ten_min_str = extract_val("TenMin")
+                one_hr_str = extract_val("OneHr")
+                three_hr_str = extract_val("ThreeHr")
+                six_hr_str = extract_val("SixHr")
+                twl_hr_str = extract_val("TwlHr")
+                all_hr_str = extract_val("Allhr")
+                today_str = extract_val("today")
+                yesterday_str = extract_val("yesterday")
+
+                stations.append({
+                    "code": code,
+                    "name": name,
+                    "region": region,
+                    "info": info,
+                    "ten_min": ten_min_str,
+                    "one_hr": one_hr_str,
+                    "three_hr": three_hr_str,
+                    "six_hr": six_hr_str,
+                    "twl_hr": twl_hr_str,
+                    "all_hr": all_hr_str,
+                    "today": today_str,
+                    "yesterday": yesterday_str,
+                    "ten_min_num": parse_float(ten_min_str),
+                    "one_hr_num": parse_float(one_hr_str),
+                    "three_hr_num": parse_float(three_hr_str),
+                    "six_hr_num": parse_float(six_hr_str),
+                    "twl_hr_num": parse_float(twl_hr_str),
+                    "all_hr_num": parse_float(all_hr_str),
+                    "today_num": parse_float(today_str),
+                    "yesterday_num": parse_float(yesterday_str),
+                    "is_linyuan": ("林園" in region or "林園" in name or code in ['C0V72', 'C0V90'])
+                })
         except Exception as e:
-            if cls._cache['rainfall']['data']:
-                return cls._cache['rainfall']['data']
-            return {'error': str(e), 'stations': [], 'time': '', 'gentime': ''}
+            pass
 
-        # 解析 HTML 表格
-        datatime = ""
-        gentime = ""
-        m_time = re.search(r"data-time='([^']+)'", html)
-        if m_time:
-            datatime = m_time.group(1)
-        m_gentime = re.search(r"data-gentime='([^']+)'", html)
-        if m_gentime:
-            gentime = m_gentime.group(1)
-
-        trs = re.findall(r'<tr[^>]*>.*?</tr>', html, re.DOTALL)
-        stations = []
-
-        def parse_float(val):
+        # 2. 若 HTML 抓取無資料或失敗，自動切換官方 OpenData API 備援 (O-A0002-001)
+        if not stations:
             try:
-                v = val.replace(',', '').strip()
-                if v == '-' or v == 'X' or v == '':
-                    return 0.0
-                return float(v)
-            except:
-                return 0.0
+                api_key = 'CWA-8059CE68-7A75-4C3D-BDA6-CBF3BC6447EF'
+                api_url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0002-001?Authorization={api_key}&_={int(now * 1000)}"
+                api_req = urllib.request.Request(api_url, headers=cls.get_headers())
+                with urllib.request.urlopen(api_req, timeout=8) as resp:
+                    api_data = json.loads(resp.read().decode('utf-8'))
+                    all_raw_stations = api_data.get('records', {}).get('Station', [])
+                    for st in all_raw_stations:
+                        county = st.get('GeoInfo', {}).get('CountyName', '')
+                        county_code = st.get('GeoInfo', {}).get('CountyCode', '')
+                        if '高雄' in county or county_code == '64000':
+                            raw_id = st.get('StationId', '')
+                            town = st.get('GeoInfo', {}).get('TownName', '')
+                            rf = st.get('RainfallElement', {})
+                            ten_min = str(rf.get('Past10Min', {}).get('Precipitation', '-'))
+                            one_hr = str(rf.get('Past1hr', {}).get('Precipitation', '-'))
+                            three_hr = str(rf.get('Past3hr', {}).get('Precipitation', '-'))
+                            six_hr = str(rf.get('Past6Hr', {}).get('Precipitation', '-'))
+                            twl_hr = str(rf.get('Past12hr', {}).get('Precipitation', '-'))
+                            all_hr = str(rf.get('Past24hr', {}).get('Precipitation', '-'))
+                            today = str(rf.get('Now', {}).get('Precipitation', '-'))
+                            yesterday = str(rf.get('Past2days', {}).get('Precipitation', '-'))
 
-        for tr in trs:
-            name_match = re.search(r'<span[^>]*title=[\'"]([^\'"]+)[\'"]>([^<]+)<br>\(([^)]+)\)</span>', tr)
-            if not name_match:
-                continue
-            info = name_match.group(1).strip()
-            name = name_match.group(2).strip()
-            code = name_match.group(3).strip()
+                            clean_code = raw_id[:-1] if (len(raw_id) == 6 and raw_id[-1] in '0123456789') else raw_id
 
-            region_match = re.search(r'<td headers="region"[^>]*>([^<]+)</td>', tr)
-            region = region_match.group(1).strip() if region_match else ""
+                            stations.append({
+                                "code": clean_code,
+                                "fullCode": raw_id,
+                                "name": st.get('StationName', ''),
+                                "region": f"{town}區" if town else "高雄市",
+                                "info": f"{raw_id} 高雄市{town}區 {st.get('StationName', '')} - 中央氣象署",
+                                "ten_min": ten_min,
+                                "one_hr": one_hr,
+                                "three_hr": three_hr,
+                                "six_hr": six_hr,
+                                "twl_hr": twl_hr,
+                                "all_hr": all_hr,
+                                "today": today,
+                                "yesterday": yesterday,
+                                "ten_min_num": parse_float(ten_min),
+                                "one_hr_num": parse_float(one_hr),
+                                "three_hr_num": parse_float(three_hr),
+                                "six_hr_num": parse_float(six_hr),
+                                "twl_hr_num": parse_float(twl_hr),
+                                "all_hr_num": parse_float(all_hr),
+                                "today_num": parse_float(today),
+                                "yesterday_num": parse_float(yesterday),
+                                "is_linyuan": ("林園" in town or raw_id.startswith('C0V90') or raw_id.startswith('C0V72'))
+                            })
+                    datatime = time.strftime('%Y-%m-%d %H:%M:%S')
+            except Exception as e:
+                pass
 
-            def extract_val(header):
-                m = re.search(rf'<td headers="{header}"[^>]*>(?:<span[^>]*>)?([^<]+)(?:</span>)?</td>', tr)
-                return m.group(1).strip() if m else "-"
-
-            ten_min_str = extract_val("TenMin")
-            one_hr_str = extract_val("OneHr")
-            three_hr_str = extract_val("ThreeHr")
-            six_hr_str = extract_val("SixHr")
-            twl_hr_str = extract_val("TwlHr")
-            all_hr_str = extract_val("Allhr")
-            today_str = extract_val("today")
-            yesterday_str = extract_val("yesterday")
-
-            stations.append({
-                "code": code,
-                "name": name,
-                "region": region,
-                "info": info,
-                "ten_min": ten_min_str,
-                "one_hr": one_hr_str,
-                "three_hr": three_hr_str,
-                "six_hr": six_hr_str,
-                "twl_hr": twl_hr_str,
-                "all_hr": all_hr_str,
-                "today": today_str,
-                "yesterday": yesterday_str,
-                "ten_min_num": parse_float(ten_min_str),
-                "one_hr_num": parse_float(one_hr_str),
-                "three_hr_num": parse_float(three_hr_str),
-                "six_hr_num": parse_float(six_hr_str),
-                "twl_hr_num": parse_float(twl_hr_str),
-                "all_hr_num": parse_float(all_hr_str),
-                "today_num": parse_float(today_str),
-                "yesterday_num": parse_float(yesterday_str),
-                "is_linyuan": ("林園" in region or "林園" in name or code in ['C0V72', 'C0V90'])
-            })
+        if not stations and cls._cache['rainfall']['data']:
+            return cls._cache['rainfall']['data']
 
         result = {
             'datatime': datatime,
@@ -142,7 +200,8 @@ class CWADataFetcher:
             'total_stations': len(stations),
             'stations': stations
         }
-        cls._cache['rainfall'] = {'time': now, 'data': result}
+        if stations:
+            cls._cache['rainfall'] = {'time': now, 'data': result}
         return result
 
     @classmethod

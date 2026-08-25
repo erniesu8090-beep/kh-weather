@@ -821,21 +821,21 @@
         ]
       },
       {
-        group: "🏭 林園 / 大寮 / 大樹 / 仁武 / 大社",
+        group: "🏭 林園 / 大樹 / 仁武 / 大社",
         stations: [
-          { code: "C0V72", name: "林園", district: "林園" },
           { code: "C0V90", name: "汕尾", district: "林園" },
-          { code: "C0V73", name: "大寮", district: "大寮" },
           { code: "C0V91", name: "大樹", district: "大樹" },
           { code: "C0V35", name: "溪埔", district: "大樹" },
-          { code: "C0V68", name: "仁武", district: "仁武" },
-          { code: "C0V77", name: "大社", district: "大社" }
+          { code: "CAP06", name: "國三S385K", district: "大樹" },
+          { code: "C0V77", name: "大社", district: "大社" },
+          { code: "CAP04", name: "國一N361K", district: "仁武" }
         ]
       },
       {
-        group: "🌾 北高雄 (岡山/橋頭/梓官/路竹/彌陀等)",
+        group: "🌾 北高雄 (岡山/橋頭/梓官/彌陀/路竹等)",
         stations: [
           { code: "C0V66", name: "岡山", district: "岡山" },
+          { code: "CAP02", name: "國一S346K", district: "岡山" },
           { code: "C0V76", name: "橋頭", district: "橋頭" },
           { code: "C0V61", name: "梓官", district: "梓官" },
           { code: "C0V85", name: "蚵仔寮", district: "梓官" },
@@ -846,40 +846,60 @@
           { code: "C0V63", name: "茄萣", district: "茄萣" },
           { code: "C0V88", name: "興達", district: "茄萣" },
           { code: "C0V75", name: "路竹", district: "路竹" },
+          { code: "CAP01", name: "國一S342K", district: "路竹" },
           { code: "C0V53", name: "阿蓮", district: "阿蓮" },
           { code: "C0V40", name: "阿公店", district: "燕巢" },
           { code: "C1V39", name: "尖山", district: "燕巢" },
-          { code: "01P28", name: "水利署古亭坑", district: "田寮" }
+          { code: "01P28", name: "水利署古亭坑", district: "田寮" },
+          { code: "C0V64", name: "湖內", district: "湖內" }
         ]
       },
       {
         group: "⛰️ 東高雄山區 (旗山/美濃/六龜/甲仙/桃源等)",
         stations: [
           { code: "C0V74", name: "旗山", district: "旗山" },
+          { code: "72V14", name: "高改旗南分場", district: "旗山" },
           { code: "C2V31", name: "美濃", district: "美濃" },
           { code: "C2V57", name: "吉東", district: "美濃" },
           { code: "C0V36", name: "內門", district: "內門" },
           { code: "C2V58", name: "瑞山", district: "內門" },
+          { code: "C2V26", name: "月眉", district: "杉林" },
           { code: "88V56", name: "集來", district: "杉林" },
           { code: "C0V80", name: "六龜", district: "六龜" },
           { code: "C1V59", name: "新發", district: "六龜" },
           { code: "C1V34", name: "大津", district: "六龜" },
+          { code: "E2P98", name: "六龜林試", district: "六龜" },
           { code: "C2V25", name: "甲仙", district: "甲仙" },
           { code: "C0V82", name: "小林", district: "甲仙" },
           { code: "C0V79", name: "萬山", district: "茂林" },
           { code: "81V96", name: "茂林國小", district: "茂林" },
-          { code: "C0V21", name: "復興", district: "桃源" },
-          { code: "C0V93", name: "天池", district: "桃源" },
+          { code: "C1V20", name: "梅山", district: "桃源" },
+          { code: "C1V23", name: "高中", district: "桃源" },
+          { code: "01V07", name: "天池", district: "桃源" },
           { code: "C1V60", name: "藤枝", district: "桃源" },
+          { code: "C0V94", name: "美瓏山", district: "桃源" },
           { code: "81V83", name: "那瑪夏國中", district: "那瑪夏" }
         ]
       }
     ];
 
+    // 舊代碼自動遷移映射表
+    const DEPRECATED_CODE_MAP = {
+      'C0V72': 'C0V90', // 原林園 -> 汕尾
+      'C0V73': 'C0V45', // 原大寮 -> 鳳森
+      'C0V68': 'CAP04', // 原仁武 -> 國一N361K
+      'C0V21': 'C1V20', // 原復興 -> 梅山
+      'C0V93': '01V07'  // 原天池 -> 天池新碼 01V07
+    };
+
     const savedStations = (() => {
       try {
         const stored = JSON.parse(localStorage.getItem('kh_rain_stations'));
-        if (Array.isArray(stored) && stored.length >= 2) return stored.slice(0, 2);
+        if (Array.isArray(stored) && stored.length >= 2) {
+          const s1 = DEPRECATED_CODE_MAP[stored[0]] || stored[0];
+          const s2 = DEPRECATED_CODE_MAP[stored[1]] || stored[1];
+          return [s1, s2];
+        }
       } catch (e) {}
       return ['C0V45', 'C0V84'];
     })();
@@ -1004,10 +1024,14 @@
         } catch (e) {}
 
         // 前端直連備援模式 (無 Python 伺服器時，如 GitHub Pages / 手機直連)
-        if (!radar || !rainfall) {
+        if (!radar || !rainfall || !rainfall.stations || rainfall.stations.length === 0) {
           const directData = await directFallback();
           if (!radar && directData.radar) renderRadar(directData.radar);
-          if (!rainfall && directData.rainfall) renderRainfall(directData.rainfall);
+          if ((!rainfall || !rainfall.stations || rainfall.stations.length === 0) && directData.rainfall) {
+            renderRainfall(directData.rainfall);
+          } else if (rainfall) {
+            renderRainfall(rainfall);
+          }
         } else {
           renderRainfall(rainfall);
           renderRadar(radar);
@@ -1092,38 +1116,40 @@
             };
             const khStations = allStations.filter(st => {
               const county = st.GeoInfo?.CountyName || '';
-              return county.includes('高雄') || (st.StationId && (
-                st.StationId.startsWith('C0V') || st.StationId.startsWith('C1V') || 
-                st.StationId.startsWith('C2V') || st.StationId.startsWith('CAP') || 
-                st.StationId.startsWith('46744') || st.StationId.startsWith('G2P') || 
-                st.StationId.startsWith('01P') || st.StationId.startsWith('81V') || 
-                st.StationId.startsWith('88V') || st.StationId.startsWith('O1V') || 
-                st.StationId.startsWith('F1V') || st.StationId.startsWith('E2P')
-              ));
+              const countyCode = st.GeoInfo?.CountyCode || '';
+              return county.includes('高雄') || countyCode === '64000';
             });
             const stations = khStations.map(st => {
               const rf = st.RainfallElement || {};
               const ten_min = rf.Past10Min?.Precipitation ?? '-';
               const one_hr = rf.Past1hr?.Precipitation ?? '-';
               const three_hr = rf.Past3hr?.Precipitation ?? '-';
+              const six_hr = rf.Past6Hr?.Precipitation ?? '-';
+              const twl_hr = rf.Past12hr?.Precipitation ?? '-';
               const all_hr = rf.Past24hr?.Precipitation ?? '-';
               const today = rf.Now?.Precipitation ?? '-';
+              const yesterday = rf.Past2days?.Precipitation ?? '-';
               const town = st.GeoInfo?.TownName || '';
+              const rawId = String(st.StationId || '');
+              const cleanCode = (rawId.length === 6 && /[0-9]$/.test(rawId)) ? rawId.slice(0, 5) : rawId;
               return {
-                code: st.StationId ? st.StationId.replace(/0$/, '') : '',
-                fullCode: st.StationId || '',
+                code: cleanCode,
+                fullCode: rawId,
                 name: st.StationName || '',
-                region: town ? `${town}區` : '',
+                region: town ? `${town}區` : '高雄市',
                 ten_min: String(ten_min),
                 ten_min_num: cleanNum(ten_min),
                 one_hr: String(one_hr),
                 one_hr_num: cleanNum(one_hr),
                 three_hr: String(three_hr),
                 three_hr_num: cleanNum(three_hr),
+                six_hr: String(six_hr),
+                twl_hr: String(twl_hr),
                 all_hr: String(all_hr),
                 all_hr_num: cleanNum(all_hr),
                 today: String(today),
-                today_num: cleanNum(today)
+                today_num: cleanNum(today),
+                yesterday: String(yesterday)
               };
             });
 
@@ -1169,38 +1195,64 @@
     // --- 測站搜尋匹配 ---
     function findStation(code) {
       if (!code) return null;
-      const cleanTarget = code.replace(/0$/, '').toUpperCase();
-      
-      // 1. 從已下載的即時雨量資料中找
-      if (state.stations && state.stations.length > 0) {
-        const found = state.stations.find(s => {
-          const sCode = (s.code || '').replace(/0$/, '').toUpperCase();
-          const sFull = (s.fullCode || '').toUpperCase();
-          return sCode === cleanTarget || s.code === code || sFull === cleanTarget;
-        });
-        if (found) return found;
+      const targetCode = String(code).trim().toUpperCase();
+
+      // 先查選單裡的測站定義
+      let stationMeta = null;
+      for (const grp of KAOHSIUNG_STATIONS_GROUPS) {
+        const found = grp.stations.find(s => String(s.code).toUpperCase() === targetCode);
+        if (found) {
+          stationMeta = found;
+          break;
+        }
       }
 
-      // 2. 備援預設資訊
-      for (const grp of KAOHSIUNG_STATIONS_GROUPS) {
-        const st = grp.stations.find(s => s.code === code);
-        if (st) {
-          return {
-            code: st.code,
-            name: st.name,
-            region: `${st.district}區`,
-            ten_min: '0.0',
-            ten_min_num: 0,
-            one_hr: '0.0',
-            one_hr_num: 0,
-            three_hr: '0.0',
-            three_hr_num: 0,
-            all_hr: '0.0',
-            all_hr_num: 0,
-            today: '0.0',
-            today_num: 0
-          };
+      // 1. 從已下載的即時雨量資料中找
+      if (state.stations && state.stations.length > 0) {
+        // (1) 代碼完全比對
+        let matched = state.stations.find(s => {
+          const sCode = String(s.code || '').trim().toUpperCase();
+          const sFull = String(s.fullCode || '').trim().toUpperCase();
+          return (sCode && sCode === targetCode) || (sFull && sFull === targetCode);
+        });
+        if (matched) return matched;
+
+        // (2) 5 碼前綴比對 (處理如 46744 vs 467441, C0V45 vs C0V450)
+        if (targetCode.length >= 4) {
+          const tPrefix = targetCode.slice(0, 5);
+          matched = state.stations.find(s => {
+            const sCode = String(s.code || '').trim().toUpperCase();
+            const sFull = String(s.fullCode || '').trim().toUpperCase();
+            return (sCode.length >= 4 && sCode.slice(0, 5) === tPrefix) || 
+                   (sFull.length >= 4 && sFull.slice(0, 5) === tPrefix);
+          });
+          if (matched) return matched;
         }
+
+        // (3) 站名比對
+        if (stationMeta && stationMeta.name) {
+          matched = state.stations.find(s => s.name === stationMeta.name);
+          if (matched) return matched;
+        }
+      }
+
+      // 2. 備援預設資訊 (從選單清單中搜尋)
+      if (stationMeta) {
+        return {
+          code: stationMeta.code,
+          name: stationMeta.name,
+          region: `${stationMeta.district}區`,
+          ten_min: '0.0',
+          ten_min_num: 0,
+          one_hr: '0.0',
+          one_hr_num: 0,
+          three_hr: '0.0',
+          three_hr_num: 0,
+          all_hr: '0.0',
+          all_hr_num: 0,
+          today: '0.0',
+          today_num: 0
+        };
       }
       return null;
     }
