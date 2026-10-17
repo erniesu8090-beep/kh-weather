@@ -408,7 +408,7 @@
     function togglePlay() {
       state.isPlaying = !state.isPlaying;
       const button = document.getElementById('btnPlayPause');
-      document.getElementById('playIcon').textContent = state.isPlaying ? 'Ⅱ' : '▶';
+      document.getElementById('playIcon').setAttribute('data-playing', String(state.isPlaying));
       button.setAttribute('aria-pressed', String(state.isPlaying));
       button.setAttribute('aria-label', state.isPlaying ? '暫停影像' : '播放影像');
       clearInterval(state.timer);
