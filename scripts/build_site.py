@@ -1,5 +1,6 @@
 """Build a credential-free static dashboard with a timestamped CWA snapshot."""
 import json
+import hashlib
 import shutil
 import sys
 from pathlib import Path
@@ -19,6 +20,12 @@ def build(destination):
         raise RuntimeError('No Linyuan radar frames received; keeping the last successful deployment')
     for name in ['index.html', 'config.json', 'styles.css', 'stations.js', 'weather.js', 'app.js', 'sw.js', 'manifest.json', 'favicon.ico', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'qrcode.png']:
         shutil.copy2(ROOT / name, destination / name)
+    # Content versions prevent HTTP/PWA caches from mixing old and new releases.
+    index = (destination / 'index.html').read_text(encoding='utf-8')
+    for asset in ['styles.css', 'stations.js', 'weather.js', 'app.js']:
+        version = hashlib.sha256((destination / asset).read_bytes()).hexdigest()[:12]
+        index = index.replace(f'\"{asset}\"', f'\"{asset}?v={version}\"')
+    (destination / 'index.html').write_text(index, encoding='utf-8')
     payload = {'rainfall': rainfall, 'radar': radar, 'generated_at': now_iso()}
     (destination / 'weather.json').write_text(json.dumps(payload, ensure_ascii=False), encoding='utf-8')
     (destination / '.nojekyll').touch()

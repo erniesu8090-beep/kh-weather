@@ -504,7 +504,7 @@
 
       // 註冊 PWA Service Worker (支援手機安裝專屬 App 與高清圖示)
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./sw.js').catch(err => {
+        navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(err => {
           console.log('SW reg error:', err);
         });
       }

@@ -53,4 +53,24 @@ class FetchTests(unittest.TestCase):
         finally:
             httpd.server_close()
 
+
+class BuildTests(unittest.TestCase):
+    def test_static_package_versions_assets_and_preserves_public_api_config(self):
+        import tempfile
+        from pathlib import Path
+        from scripts.build_site import build
+        rain = {'stations':[{'code':'C0V45','ten_min':'0'}]}
+        radar = {'areas':{'Area2':{'scans_hd':[{'url':'https://example.test/radar.png','time':'2026/10/17 09:20'}]}}}
+        base = Path(__file__).resolve().parents[1] / 'test-results'
+        base.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=base) as folder:
+            self.assertTrue(Path(folder).resolve().is_relative_to(base.resolve()))
+            with patch('server.CWADataFetcher.fetch_rainfall', return_value=rain), patch('server.CWADataFetcher.fetch_radar', return_value=radar):
+                build(folder)
+            html=(Path(folder)/'index.html').read_text(encoding='utf-8')
+            for name in ['styles.css','stations.js','weather.js','app.js']:
+                self.assertRegex(html, name.replace('.',r'\.')+r'\?v=[0-9a-f]{12}')
+            self.assertEqual(json.loads((Path(folder)/'config.json').read_text())['cwaApiKey'],json.loads(Path('config.json').read_text())['cwaApiKey'])
+            self.assertTrue((Path(folder)/'weather.json').exists())
+
 if __name__ == '__main__': unittest.main()
