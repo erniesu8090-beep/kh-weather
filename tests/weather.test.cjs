@@ -52,3 +52,8 @@ test('API normalization preserves per-station observation times and missing data
   assert.equal(st.one_hr_num, 0);
   assert.equal(st.observed_at, raw[0].ObsTime.DateTime);
 });
+test('compact displayed time always uses Taiwan timezone', () => {
+  assert.equal(W.formatTime('2026-10-17T01:20:00Z'), '10/17 09:20');
+  assert.equal(W.formatTime('2026-10-17T16:20:00Z'), '10/18 00:20');
+  assert.equal(W.formatTime(''), '—');
+});

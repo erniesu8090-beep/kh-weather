@@ -84,3 +84,13 @@ test('hosted mode survives live API and radar failures using snapshot',async()=>
   assert.equal(h.run('state.data.backup'),true);
   assert.ok(h.run('state.radarScans.length')>0);
 });
+test('historical frame is labeled as history while latest feed remains fresh',async()=>{
+  const h=harness();
+  h.fixture.radar.areas.Area2.scans_hd[0].time=new Date(Date.now()-50*60000).toISOString();
+  await h.run('fetchData(true)');
+  await h.run('state.activeIndex=0; updateRadarFrame()');
+  assert.match(h.nodes.get('radarTimestamp').textContent,/歷史影格/);
+  assert.doesNotMatch(h.nodes.get('radarTimestamp').textContent,/來源資料過期/);
+  h.run('renderRadar(state.data.radar)');
+  assert.equal(h.run('state.activeIndex'),0);
+});

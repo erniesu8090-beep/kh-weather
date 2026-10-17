@@ -201,11 +201,11 @@
       const status = document.getElementById('dataStatus');
       if (!data || state.connectionFailed) return;
       const selected = state.selectedStations.map(findStation);
-      const outdated = selected.some(st => !st || Weather.stale(st.observed_at || data.rainfall?.datatime));
+      const outdated = data.rainfall?.stale || selected.some(st => !st || Weather.stale(st.observed_at || data.rainfall?.datatime));
       const missing = selected.some(st => Weather.finiteRain(st?.ten_min) === null);
       status.dataset.tone = outdated || missing ? 'warning' : 'success';
       status.textContent = outdated ? '觀測資料過期或時間不明，請留意資料時間' : missing ? '部分測站暫無資料，請選擇其他測站' : `觀測資料正常 · ${data.backup ? '備援觀測資料' : '氣象署即時連線'} · 每分鐘檢查更新`;
-      document.getElementById('sourceTime').textContent = `資料取得：${data.generated_at || data.rainfall?.fetch_time || '—'}`;
+      document.getElementById('sourceTime').textContent = `資料取得：${Weather.formatTime(data.generated_at || data.rainfall?.fetch_time)}`;
     }
     function fetchData(force = false) {
       if (state.pending) return state.pending;
@@ -329,7 +329,8 @@
       const level = Weather.rainLevel(st);
       badge.textContent = level.text;
       badge.dataset.tone = level.tone;
-      document.getElementById(`${cardPrefix}Time`).textContent = `觀測：${observed || '—'}${st && Weather.stale(observed) ? ' · 已過期／時間不明' : ''}`;
+      document.getElementById(`${cardPrefix}Time`).title = observed || '觀測時間不明';
+      document.getElementById(`${cardPrefix}Time`).textContent = `觀測：${Weather.formatTime(observed)}${st && Weather.stale(observed) ? ' · 已過期／時間不明' : ''}`;
     }
     function renderRadar(data) {
       const modes = {
@@ -340,9 +341,10 @@
       };
       const [all, label] = modes[state.radarMode];
       const previousTime = state.radarScans[state.activeIndex]?.time;
+      const wasLatest = state.activeIndex >= state.radarScans.length - 1;
       state.radarScans = Weather.filterScans(all, state.hoursFilter);
       const previousIndex = state.radarScans.findIndex(s => s.time === previousTime);
-      state.activeIndex = state.isPlaying && previousIndex >= 0 ? previousIndex : Math.max(0, state.radarScans.length - 1);
+      state.activeIndex = (state.isPlaying || !wasLatest) && previousIndex >= 0 ? previousIndex : Math.max(0, state.radarScans.length - 1);
       document.getElementById('radarBadge').textContent = label;
       document.querySelector('.dbz-legend-bar').hidden = state.radarMode === 'satellite_taiwan';
       document.getElementById('radarImg').alt = label;
@@ -389,7 +391,7 @@
         await loadImage(current.url);
         if (token !== state.imageToken) return;
         img.src = current.url; img.hidden = false; status.hidden = true;
-        document.getElementById('radarTimestamp').textContent = `${current.time || '時間不明'}${Weather.stale(current.time, Date.now(), 30) ? ' · 資料過期' : ''}`;
+        document.getElementById('radarTimestamp').textContent = `${current.time || '時間不明'}${state.activeIndex < state.radarScans.length - 1 ? ' · 歷史影格' : ''}${Weather.stale(state.radarScans.at(-1)?.time, Date.now(), 30) ? ' · 來源資料過期' : ''}`;
         const next = state.radarScans[(state.activeIndex + 1) % state.radarScans.length];
         if (next) loadImage(next.url).catch(() => {});
       } catch (error) {

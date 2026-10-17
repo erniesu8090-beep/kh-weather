@@ -41,7 +41,14 @@
       return result;
     });
   }
-  const api = { finiteRain, rainLevel, timestamp, stale, filterScans, normalizeStations };
+  function formatTime(value) {
+    const time = timestamp(value);
+    if (!Number.isFinite(time)) return '—';
+    const parts = new Intl.DateTimeFormat('en-US', {timeZone: 'Asia/Taipei', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'}).formatToParts(new Date(time));
+    const pick = type => parts.find(p => p.type === type).value;
+    return `${pick('month')}/${pick('day')} ${pick('hour')}:${pick('minute')}`;
+  }
+  const api = { formatTime, finiteRain, rainLevel, timestamp, stale, filterScans, normalizeStations };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Weather = api;
 })(typeof window === 'undefined' ? globalThis : window);

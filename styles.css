@@ -210,7 +210,7 @@
       outline: none;
       cursor: pointer;
       width: auto;
-      max-width: 125px;
+      max-width: 100%;
       text-overflow: ellipsis;
       white-space: nowrap;
       appearance: none;
@@ -587,7 +587,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: initial; }
 body { min-height: 100dvh; padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); background: radial-gradient(ellipse at top, #172947, #0b1120 65%); line-height: 1.5; }
 .container { max-width: 1280px; height: auto; min-width: 0; gap: 16px; display: grid; grid-template-columns: 320px minmax(0, 1fr); align-content: start; }
 header { grid-column: 1 / -1; padding: 18px 22px; border-radius: 18px; }
-.brand-icon { width: 40px; height: 40px; font-size: 26px; }
+.brand-icon { width: 40px; height: 40px; font-size: 26px; line-height: 1; }
+.brand-icon span { width: auto !important; height: auto !important; }
 .brand-text h1 { font-size: 1.15rem; flex-wrap: wrap; line-height: 1.5; }
 .brand-text p { font-size: .8rem; }
 .tag-district, .pill-clock { font-size: .78rem; }
