@@ -15,6 +15,29 @@ import os
 import sys
 import webbrowser
 import time
+import logging
+import math
+import threading
+from datetime import datetime, timezone, timedelta
+from functools import wraps
+from concurrent.futures import ThreadPoolExecutor
+
+TAIPEI = timezone(timedelta(hours=8))
+
+def now_iso():
+    return datetime.now(TAIPEI).isoformat(timespec="seconds")
+
+def serialized(lock):
+    def decorate(fn):
+        @wraps(fn)
+        def wrapped(*args, **kwargs):
+            with lock:
+                return fn(*args, **kwargs)
+        return wrapped
+    return decorate
+
+_rain_lock = threading.RLock()
+_radar_lock = threading.RLock()
 from threading import Timer
 
 # 強制設定標準輸出與錯誤輸出為 UTF-8 編碼，避免 Windows 控制台出現亂碼
@@ -32,6 +55,14 @@ if os.name == 'nt':
         pass
 
 DIRECTORY = os.path.dirname(os.path.abspath(__file__))
+# Optional ignored local configuration; existing environment takes precedence.
+_env_path = os.path.join(DIRECTORY, '.env')
+if os.path.isfile(_env_path):
+    with open(_env_path, encoding='utf-8-sig') as _env_file:
+        for _line in _env_file:
+            if _line.startswith('CWA_API_KEY='):
+                os.environ.setdefault('CWA_API_KEY', _line.partition('=')[2].strip())
+
 
 
 class CWADataFetcher:
@@ -50,274 +81,124 @@ class CWADataFetcher:
         }
 
     @classmethod
+    @serialized(_rain_lock)
     def fetch_rainfall(cls):
         now = time.time()
-        if cls._cache['rainfall']['data'] and (now - cls._cache['rainfall']['time'] < cls.CACHE_DURATION):
-            return cls._cache['rainfall']['data']
+        cached = cls._cache['rainfall']
+        if cached['data'] and now - cached['time'] < cls.CACHE_DURATION:
+            return cached['data']
 
-        def parse_float(val):
+        def number(value):
             try:
-                if val is None:
-                    return 0.0
-                v = str(val).replace(',', '').strip()
-                if v in ('-', 'X', '', 'None', 'null'):
-                    return 0.0
-                return float(v)
-            except Exception:
-                return 0.0
+                n = float(str(value).replace(',', '').strip())
+                return n if math.isfinite(n) and n >= 0 else None
+            except (ValueError, TypeError):
+                return None
 
-        datatime = ""
-        gentime = ""
         stations = []
-
-        # 1. 優先嘗試爬取 CWA 網頁 HTML 表格
-        url = f"https://www.cwa.gov.tw/V8/C/P/Rainfall/MOD_10M/64.html?ID={int(now * 1000)}"
-        req = urllib.request.Request(url, headers=cls.get_headers())
+        datatime = gentime = ''
+        source = 'OpenData API'
         try:
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                html = resp.read().decode('utf-8', errors='ignore')
-
-            m_time = re.search(r"data-time='([^']+)'", html)
-            if m_time:
-                datatime = m_time.group(1)
-            m_gentime = re.search(r"data-gentime='([^']+)'", html)
-            if m_gentime:
-                gentime = m_gentime.group(1)
-
-            trs = re.findall(r'<tr[^>]*>.*?</tr>', html, re.DOTALL)
-            for tr in trs:
-                name_match = re.search(r'<span[^>]*title=[\'"]([^\'"]+)[\'"]>([^<]+)<br>\(([^)]+)\)</span>', tr)
-                if not name_match:
+            with open(os.path.join(DIRECTORY, 'config.json'), encoding='utf-8') as config_file:
+                public_key = json.load(config_file).get('cwaApiKey', '')
+            api_key = os.environ.get('CWA_API_KEY') or public_key
+            if not api_key:
+                raise RuntimeError('No CWA key configured')
+            url = 'https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0002-001?Authorization=' + api_key
+            with urllib.request.urlopen(urllib.request.Request(url, headers=cls.get_headers()), timeout=12) as response:
+                payload = json.load(response)
+            fields = {'ten_min': 'Past10Min', 'one_hr': 'Past1hr', 'three_hr': 'Past3hr', 'six_hr': 'Past6Hr', 'twl_hr': 'Past12hr', 'all_hr': 'Past24hr', 'today': 'Now'}
+            for raw in payload.get('records', {}).get('Station', []):
+                geo = raw.get('GeoInfo', {})
+                if '高雄' not in geo.get('CountyName', '') and str(geo.get('CountyCode', '')) != '64000':
                     continue
-                info = name_match.group(1).strip()
-                name = name_match.group(2).strip()
-                code = name_match.group(3).strip()
+                raw_id = str(raw.get('StationId', ''))
+                code = raw_id[:-1] if len(raw_id) == 6 and raw_id[-1].isdigit() else raw_id
+                station = {'code': code, 'fullCode': raw_id, 'name': raw.get('StationName', ''), 'region': geo.get('TownName', ''), 'observed_at': raw.get('ObsTime', {}).get('DateTime', '')}
+                for field, api_field in fields.items():
+                    value = number(raw.get('RainfallElement', {}).get(api_field, {}).get('Precipitation'))
+                    station[field] = '-' if value is None else str(value)
+                    station[field + '_num'] = value
+                stations.append(station)
+            datatime = min((s['observed_at'] for s in stations if s['observed_at']), default='')
+        except Exception as error:
+            logging.warning('CWA OpenData fetch failed: %s', type(error).__name__)
 
-                region_match = re.search(r'<td headers="region"[^>]*>([^<]+)</td>', tr)
-                region = region_match.group(1).strip() if region_match else ""
-
-                def extract_val(header):
-                    m = re.search(rf'<td headers="{header}"[^>]*>(?:<span[^>]*>)?([^<]+)(?:</span>)?</td>', tr)
-                    return m.group(1).strip() if m else "-"
-
-                ten_min_str = extract_val("TenMin")
-                one_hr_str = extract_val("OneHr")
-                three_hr_str = extract_val("ThreeHr")
-                six_hr_str = extract_val("SixHr")
-                twl_hr_str = extract_val("TwlHr")
-                all_hr_str = extract_val("Allhr")
-                today_str = extract_val("today")
-                yesterday_str = extract_val("yesterday")
-
-                stations.append({
-                    "code": code,
-                    "name": name,
-                    "region": region,
-                    "info": info,
-                    "ten_min": ten_min_str,
-                    "one_hr": one_hr_str,
-                    "three_hr": three_hr_str,
-                    "six_hr": six_hr_str,
-                    "twl_hr": twl_hr_str,
-                    "all_hr": all_hr_str,
-                    "today": today_str,
-                    "yesterday": yesterday_str,
-                    "ten_min_num": parse_float(ten_min_str),
-                    "one_hr_num": parse_float(one_hr_str),
-                    "three_hr_num": parse_float(three_hr_str),
-                    "six_hr_num": parse_float(six_hr_str),
-                    "twl_hr_num": parse_float(twl_hr_str),
-                    "all_hr_num": parse_float(all_hr_str),
-                    "today_num": parse_float(today_str),
-                    "yesterday_num": parse_float(yesterday_str),
-                    "is_linyuan": ("林園" in region or "林園" in name or code in ['C0V72', 'C0V90'])
-                })
-        except Exception as e:
-            pass
-
-        # 2. 若 HTML 抓取無資料或失敗，自動切換官方 OpenData API 備援 (O-A0002-001)
         if not stations:
+            source = 'CWA HTML'
             try:
-                api_key = 'CWA-8059CE68-7A75-4C3D-BDA6-CBF3BC6447EF'
-                api_url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0002-001?Authorization={api_key}&_={int(now * 1000)}"
-                api_req = urllib.request.Request(api_url, headers=cls.get_headers())
-                with urllib.request.urlopen(api_req, timeout=8) as resp:
-                    api_data = json.loads(resp.read().decode('utf-8'))
-                    all_raw_stations = api_data.get('records', {}).get('Station', [])
-                    for st in all_raw_stations:
-                        county = st.get('GeoInfo', {}).get('CountyName', '')
-                        county_code = st.get('GeoInfo', {}).get('CountyCode', '')
-                        if '高雄' in county or county_code == '64000':
-                            raw_id = st.get('StationId', '')
-                            town = st.get('GeoInfo', {}).get('TownName', '')
-                            rf = st.get('RainfallElement', {})
-                            ten_min = str(rf.get('Past10Min', {}).get('Precipitation', '-'))
-                            one_hr = str(rf.get('Past1hr', {}).get('Precipitation', '-'))
-                            three_hr = str(rf.get('Past3hr', {}).get('Precipitation', '-'))
-                            six_hr = str(rf.get('Past6Hr', {}).get('Precipitation', '-'))
-                            twl_hr = str(rf.get('Past12hr', {}).get('Precipitation', '-'))
-                            all_hr = str(rf.get('Past24hr', {}).get('Precipitation', '-'))
-                            today = str(rf.get('Now', {}).get('Precipitation', '-'))
-                            yesterday = str(rf.get('Past2days', {}).get('Precipitation', '-'))
-
-                            clean_code = raw_id[:-1] if (len(raw_id) == 6 and raw_id[-1] in '0123456789') else raw_id
-
-                            stations.append({
-                                "code": clean_code,
-                                "fullCode": raw_id,
-                                "name": st.get('StationName', ''),
-                                "region": f"{town}區" if town else "高雄市",
-                                "info": f"{raw_id} 高雄市{town}區 {st.get('StationName', '')} - 中央氣象署",
-                                "ten_min": ten_min,
-                                "one_hr": one_hr,
-                                "three_hr": three_hr,
-                                "six_hr": six_hr,
-                                "twl_hr": twl_hr,
-                                "all_hr": all_hr,
-                                "today": today,
-                                "yesterday": yesterday,
-                                "ten_min_num": parse_float(ten_min),
-                                "one_hr_num": parse_float(one_hr),
-                                "three_hr_num": parse_float(three_hr),
-                                "six_hr_num": parse_float(six_hr),
-                                "twl_hr_num": parse_float(twl_hr),
-                                "all_hr_num": parse_float(all_hr),
-                                "today_num": parse_float(today),
-                                "yesterday_num": parse_float(yesterday),
-                                "is_linyuan": ("林園" in town or raw_id.startswith('C0V90') or raw_id.startswith('C0V72'))
-                            })
-                    datatime = time.strftime('%Y-%m-%d %H:%M:%S')
-            except Exception as e:
-                pass
-
-        if not stations and cls._cache['rainfall']['data']:
-            return cls._cache['rainfall']['data']
-
-        result = {
-            'datatime': datatime,
-            'gentime': gentime,
-            'fetch_time': time.strftime('%Y-%m-%d %H:%M:%S'),
-            'total_stations': len(stations),
-            'stations': stations
-        }
+                url = f'https://www.cwa.gov.tw/V8/C/P/Rainfall/MOD_10M/64.html?ID={int(now * 1000)}'
+                with urllib.request.urlopen(urllib.request.Request(url, headers=cls.get_headers()), timeout=12) as response:
+                    html = response.read().decode('utf-8', errors='replace')
+                match = re.search(r"data-time=['\"]([^'\"]+)", html)
+                datatime = match.group(1) if match else ''
+                for row in re.findall(r'<tr[^>]*>.*?</tr>', html, re.DOTALL):
+                    name = re.search(r"<span[^>]*title=['\"]([^'\"]+)['\"]>([^<]+)<br>\(([^)]+)\)</span>", row)
+                    if not name:
+                        continue
+                    region = re.search(r'<td headers="region"[^>]*>([^<]+)</td>', row)
+                    station = {'code': name.group(3), 'name': name.group(2), 'region': region.group(1) if region else '', 'observed_at': datatime}
+                    for field, header in {'ten_min': 'TenMin', 'one_hr': 'OneHr', 'three_hr': 'ThreeHr', 'six_hr': 'SixHr', 'twl_hr': 'TwlHr', 'all_hr': 'Allhr', 'today': 'today'}.items():
+                        cell = re.search(rf'<td headers="{header}"[^>]*>(.*?)</td>', row, re.DOTALL)
+                        text = re.sub('<[^>]+>', '', cell.group(1)).strip() if cell else '-'
+                        station[field] = text
+                        station[field + '_num'] = number(text)
+                    stations.append(station)
+            except Exception as error:
+                logging.warning('CWA HTML fetch failed: %s', type(error).__name__)
+        if not stations and cached['data']:
+            return {**cached['data'], 'stale': True, 'error': '上游來源無法更新'}
+        result = {'datatime': datatime, 'gentime': gentime, 'fetch_time': now_iso(), 'source': source, 'stale': not bool(stations), 'stations': stations, 'total_stations': len(stations)}
         if stations:
             cls._cache['rainfall'] = {'time': now, 'data': result}
         return result
 
     @classmethod
+    @serialized(_radar_lock)
     def fetch_radar(cls):
         now = time.time()
-        if cls._cache['radar']['data'] and (now - cls._cache['radar']['time'] < cls.CACHE_DURATION):
-            return cls._cache['radar']['data']
+        cached = cls._cache['radar']
+        if cached['data'] and now - cached['time'] < cls.CACHE_DURATION:
+            return cached['data']
 
-        url = f"https://www.cwa.gov.tw/Data/js/obs_img/Observe_radar_rain.js?_={int(now * 1000)}"
-        req = urllib.request.Request(url, headers=cls.get_headers())
-        try:
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                js_content = resp.read().decode('utf-8', errors='ignore')
-        except Exception as e:
-            if cls._cache['radar']['data']:
-                return cls._cache['radar']['data']
-            return {'error': str(e), 'areas': {}}
+        def get_script(name):
+            try:
+                url = f'https://www.cwa.gov.tw/Data/js/obs_img/{name}?_={int(now * 1000)}'
+                with urllib.request.urlopen(urllib.request.Request(url, headers=cls.get_headers()), timeout=10) as response:
+                    return response.read().decode('utf-8', errors='replace')
+            except Exception as error:
+                logging.warning('CWA image metadata failed (%s): %s', name, type(error).__name__)
+                return ''
+
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            rain_js, radar_js, sat_js = list(pool.map(get_script, ['Observe_radar_rain.js', 'Observe_radar.js', 'Observe_sat.js']))
+
+        def scans(content, folder, prefix=''):
+            entries = re.findall(r"\{\s*\"img\":'([^']+)',\s*'text':'([^']+)'\}", content)
+            return [{'url': f'https://www.cwa.gov.tw/Data/{folder}/{path}', 'filename': path, 'time': observed} for path, observed in entries if path.startswith(prefix)]
 
         areas = {}
-        for area_key, area_name in [('Area0', '新北樹林'), ('Area1', '臺中南屯'), ('Area2', '高雄林園')]:
-            idx = js_content.find(f"'{area_key}'")
-            scans_3600 = []
-            scans_1000 = []
-            if idx != -1:
-                sub = js_content[idx:]
-                next_area_idx = sub.find("'Area", 10)
-                end_idx = next_area_idx if next_area_idx != -1 else len(sub)
-                area_sub = sub[:end_idx]
-
-                s0_idx = area_sub.find("'size0'")
-                s1_idx = area_sub.find("'size1'")
-
-                if s0_idx != -1:
-                    s0_sub = area_sub[s0_idx:s1_idx] if s1_idx != -1 else area_sub[s0_idx:]
-                    entries = re.findall(r"\{\s*\"img\":'([^']+)',\s*'text':'([^']+)'\}", s0_sub)
-                    for img_rel, t_str in entries:
-                        scans_3600.append({
-                            'url': f"https://www.cwa.gov.tw/Data/radar_rain/{img_rel}",
-                            'filename': img_rel,
-                            'time': t_str
-                        })
-
-                if s1_idx != -1:
-                    s1_sub = area_sub[s1_idx:]
-                    entries = re.findall(r"\{\s*\"img\":'([^']+)',\s*'text':'([^']+)'\}", s1_sub)
-                    for img_rel, t_str in entries:
-                        scans_1000.append({
-                            'url': f"https://www.cwa.gov.tw/Data/radar_rain/{img_rel}",
-                            'filename': img_rel,
-                            'time': t_str
-                        })
-
-            areas[area_key] = {
-                'name': area_name,
-                'scans_hd': scans_3600,
-                'scans_sd': scans_1000,
-                'latest_hd': scans_3600[0] if scans_3600 else None,
-                'latest_sd': scans_1000[0] if scans_1000 else None,
-            }
-
-        # 解析全臺無地形與有地形雷達 (Observe_radar.js: CV1_3600 & CV1_TW_3600)
-        no_terrain_scans = []
-        with_terrain_scans = []
-        try:
-            rad_url = f"https://www.cwa.gov.tw/Data/js/obs_img/Observe_radar.js?_={int(now * 1000)}"
-            rad_req = urllib.request.Request(rad_url, headers=cls.get_headers())
-            with urllib.request.urlopen(rad_req, timeout=8) as rad_resp:
-                rad_js = rad_resp.read().decode('utf-8', errors='ignore')
-                no_t_entries = re.findall(r"\{\s*\"img\":'(CV1_3600_[^']+)',\s*'text':'([^']+)'\}", rad_js)
-                for img_rel, t_str in no_t_entries:
-                    no_terrain_scans.append({
-                        'url': f"https://www.cwa.gov.tw/Data/radar/{img_rel}",
-                        'filename': img_rel,
-                        'time': t_str
-                    })
-                with_t_entries = re.findall(r"\{\s*\"img\":'(CV1_TW_3600_[^']+)',\s*'text':'([^']+)'\}", rad_js)
-                for img_rel, t_str in with_t_entries:
-                    with_terrain_scans.append({
-                        'url': f"https://www.cwa.gov.tw/Data/radar/{img_rel}",
-                        'filename': img_rel,
-                        'time': t_str
-                    })
-        except Exception:
-            pass
-
-        # 解析全臺衛星雲圖 (臺灣彩色色調強化 LCC_IR1_CR_2750 / LCC_IR1_CR_1000)
-        satellite_scans = []
-        try:
-            sat_url = f"https://www.cwa.gov.tw/Data/js/obs_img/Observe_sat.js?_={int(now * 1000)}"
-            sat_req = urllib.request.Request(sat_url, headers=cls.get_headers())
-            with urllib.request.urlopen(sat_req, timeout=8) as sat_resp:
-                sat_js = sat_resp.read().decode('utf-8', errors='ignore')
-                entries = re.findall(r"\{\s*\"img\":'(LCC_IR1_CR_2750/[^']+)',\s*'text':'([^']+)'\}", sat_js)
-                if not entries:
-                    entries = re.findall(r"\{\s*\"img\":'(LCC_IR1_CR_1000/[^']+)',\s*'text':'([^']+)'\}", sat_js)
-                for img_rel, t_str in entries:
-                    satellite_scans.append({
-                        'url': f"https://www.cwa.gov.tw/Data/satellite/{img_rel}",
-                        'filename': img_rel,
-                        'time': t_str
-                    })
-        except Exception:
-            pass
-
+        for key, name in [('Area0', '新北樹林'), ('Area1', '臺中南屯'), ('Area2', '高雄林園')]:
+            start = rain_js.find(f"'{key}'")
+            block = rain_js[start:] if start >= 0 else ''
+            end = block.find("'Area", 10)
+            if end >= 0: block = block[:end]
+            sd_start = block.find("'size1'")
+            hd = scans(block[:sd_start] if sd_start >= 0 else block, 'radar_rain')
+            sd = scans(block[sd_start:] if sd_start >= 0 else '', 'radar_rain')
+            # Keep the last good product if just one upstream feed fails.
+            prior = cached['data'].get('areas', {}).get(key, {}) if cached['data'] else {}
+            areas[key] = {'name': name, 'scans_hd': hd or prior.get('scans_hd', []), 'scans_sd': sd or prior.get('scans_sd', [])}
         result = {
-            'fetch_time': time.strftime('%Y-%m-%d %H:%M:%S'),
-            'areas': areas,
-            'national_radar': {
-                'no_terrain': 'https://www.cwa.gov.tw/Data/radar/CV1_3600.png',
-                'with_terrain': 'https://www.cwa.gov.tw/Data/radar/CV1_TW_3600.png',
-                'rain_radar': 'https://www.cwa.gov.tw/Data/radar_rain/CV1_RCSL_1000/CV1_RCSL_1000.png'
-            },
-            'no_terrain_scans': no_terrain_scans,
-            'with_terrain_scans': with_terrain_scans,
-            'satellite_scans': satellite_scans
+            'fetch_time': now_iso(), 'areas': areas,
+            'no_terrain_scans': scans(radar_js, 'radar', 'CV1_3600_'),
+            'with_terrain_scans': scans(radar_js, 'radar', 'CV1_TW_3600_'),
+            'satellite_scans': scans(sat_js, 'satellite', 'LCC_IR1_CR_2750/') or scans(sat_js, 'satellite', 'LCC_IR1_CR_1000/')
         }
+        for field in ['no_terrain_scans', 'with_terrain_scans', 'satellite_scans']:
+            if not result[field] and cached['data']:
+                result[field] = cached['data'].get(field, [])
+        result['stale'] = not all([rain_js, radar_js, sat_js])
         cls._cache['radar'] = {'time': now, 'data': result}
         return result
 
@@ -335,10 +216,10 @@ class MonitorRequestHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_GET(self):
         if self.path.startswith('/api/rainfall'):
-            self.send_response(200)
+            data = CWADataFetcher.fetch_rainfall()
+            self.send_response(200 if data.get('stations') else 503)
             self.send_header('Content-Type', 'application/json; charset=utf-8')
             self.end_headers()
-            data = CWADataFetcher.fetch_rainfall()
             self.wfile.write(json.dumps(data, ensure_ascii=False).encode('utf-8'))
             return
 
@@ -354,11 +235,10 @@ class MonitorRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-Type', 'application/json; charset=utf-8')
             self.end_headers()
-            combined = {
-                'rainfall': CWADataFetcher.fetch_rainfall(),
-                'radar': CWADataFetcher.fetch_radar(),
-                'server_time': time.strftime('%Y-%m-%d %H:%M:%S')
-            }
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                rain_future = pool.submit(CWADataFetcher.fetch_rainfall)
+                radar_future = pool.submit(CWADataFetcher.fetch_radar)
+                combined = {'rainfall': rain_future.result(), 'radar': radar_future.result(), 'generated_at': now_iso()}
             self.wfile.write(json.dumps(combined, ensure_ascii=False).encode('utf-8'))
             return
 
@@ -420,7 +300,7 @@ def create_server(start_port=8888, max_attempts=50):
     for port in range(start_port, start_port + max_attempts):
         try:
             socketserver.TCPServer.allow_reuse_address = False
-            httpd = socketserver.TCPServer(("", port), MonitorRequestHandler)
+            httpd = http.server.ThreadingHTTPServer(("127.0.0.1", port), MonitorRequestHandler)
             return httpd, port
         except OSError as e:
             if getattr(e, 'winerror', None) == 10048 or e.errno in (48, 98, 10048):

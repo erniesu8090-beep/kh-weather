@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="referrer" content="no-referrer">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
@@ -24,595 +24,7 @@
   <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png">
   <meta name="application-name" content="高雄氣象">
   <title>高雄氣象即時監控 · 降雨雷達與雨量</title>
-  <!-- Fonts & Lucide Icons -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;900&family=JetBrains+Mono:wght@500;700;900&display=swap" rel="stylesheet">
-  <script src="https://unpkg.com/lucide@latest"></script>
-  <style>
-    :root {
-      --bg-base: #0b1120;
-      --bg-card: #131d33;
-      --bg-card-border: #1e2942;
-      --border-glow: rgba(56, 189, 248, 0.35);
-      --primary: #38bdf8;
-      --accent: #6366f1;
-      --text-main: #f1f5f9;
-      --text-muted: #94a3b8;
-      --text-faint: #64748b;
-      --success: #34d399;
-      --warning: #fbbf24;
-      --danger: #f87171;
-      --purple: #c084fc;
-      --radius-sm: 8px;
-      --radius-md: 14px;
-      --radius-lg: 20px;
-      --font-mono: 'JetBrains Mono', monospace;
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    
-    html, body {
-      height: 100vh;
-      width: 100vw;
-      margin: 0;
-      padding: 0;
-      overflow: hidden !important;
-      scrollbar-width: none;
-      -ms-overflow-style: none;
-    }
-
-    html::-webkit-scrollbar, body::-webkit-scrollbar {
-      display: none;
-    }
-    
-    body {
-      font-family: 'Noto Sans TC', sans-serif;
-      background-color: var(--bg-base);
-      color: var(--text-main);
-      display: flex;
-      justify-content: center;
-      align-items: stretch;
-      padding: 8px;
-      line-height: 1.35;
-    }
-
-    .container {
-      width: 100%;
-      max-width: 520px;
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    /* 頂部 Header */
-    header {
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 6px;
-      padding: 8px 12px;
-      background: var(--bg-card);
-      border: 1px solid var(--bg-card-border);
-      border-radius: var(--radius-md);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    }
-
-    .header-brand {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .brand-icon {
-      width: 30px;
-      height: 30px;
-      border-radius: 8px;
-      background: linear-gradient(135deg, #0284c7, #6366f1);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #fff;
-      box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
-    }
-
-    .brand-text h1 {
-      font-size: 0.92rem;
-      font-weight: 800;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      line-height: 1.1;
-    }
-
-    .tag-district {
-      font-size: 0.65rem;
-      font-weight: 700;
-      padding: 1px 5px;
-      border-radius: 4px;
-      background: rgba(56, 189, 248, 0.15);
-      color: var(--primary);
-      border: 1px solid rgba(56, 189, 248, 0.3);
-    }
-
-    .brand-text p {
-      font-size: 0.68rem;
-      color: var(--text-muted);
-      margin-top: 1px;
-    }
-
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-    }
-
-    .pill-clock {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 2px 7px;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid var(--bg-card-border);
-      border-radius: 20px;
-      font-family: var(--font-mono);
-      font-size: 0.7rem;
-      color: var(--text-muted);
-    }
-
-    .dot-pulse {
-      width: 5px;
-      height: 5px;
-      border-radius: 50%;
-      background: var(--success);
-      box-shadow: 0 0 6px var(--success);
-    }
-
-    .btn-refresh {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      padding: 4px 8px;
-      border-radius: var(--radius-sm);
-      font-size: 0.72rem;
-      font-weight: 700;
-      background: var(--primary);
-      color: #0b1120;
-      border: none;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-
-    .btn-refresh:hover {
-      background: #7dd3fc;
-      transform: translateY(-1px);
-    }
-
-    /* 2 個重點測站 KPI Cards (小港2站) */
-    .kpi-grid {
-      flex-shrink: 0;
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 6px;
-    }
-
-    .kpi-card {
-      background: var(--bg-card);
-      border: 1px solid var(--bg-card-border);
-      border-radius: var(--radius-sm);
-      padding: 8px 10px;
-      position: relative;
-      overflow: hidden;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    }
-
-    .kpi-card.linyuan {
-      border-color: rgba(56, 189, 248, 0.4);
-      background: linear-gradient(135deg, rgba(56, 189, 248, 0.08) 0%, #131d33 100%);
-    }
-
-    .kpi-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 4px;
-      margin-bottom: 3px;
-    }
-
-    .station-select-wrapper {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      min-width: 0;
-      flex: 1;
-    }
-
-    .station-select {
-      background: rgba(255, 255, 255, 0.08);
-      color: var(--text-main);
-      border: 1px solid var(--bg-card-border);
-      border-radius: 6px;
-      font-size: 0.78rem;
-      font-weight: 800;
-      font-family: inherit;
-      padding: 2px 18px 2px 6px;
-      outline: none;
-      cursor: pointer;
-      width: auto;
-      max-width: 125px;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      appearance: none;
-      -webkit-appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2338bdf8' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-      background-repeat: no-repeat;
-      background-position: right 4px center;
-      transition: all 0.15s ease;
-    }
-
-    .station-select:hover {
-      border-color: var(--primary);
-      background-color: rgba(56, 189, 248, 0.12);
-    }
-
-    .station-select:focus {
-      border-color: var(--primary);
-      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
-    }
-
-    .station-select option {
-      background: #0f172a;
-      color: #f1f5f9;
-      font-weight: 600;
-    }
-
-    .station-select optgroup {
-      background: #0b1120;
-      color: var(--primary);
-      font-weight: 700;
-      font-style: normal;
-    }
-
-    .code-badge {
-      font-size: 0.6rem;
-      font-family: var(--font-mono);
-      padding: 1px 4px;
-      border-radius: 4px;
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid var(--bg-card-border);
-      color: var(--text-muted);
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-
-    .rain-status-badge {
-      font-size: 0.65rem;
-      font-weight: 700;
-      padding: 1px 5px;
-      border-radius: 10px;
-      background: rgba(56, 189, 248, 0.15);
-      color: var(--primary);
-      border: 1px solid rgba(56, 189, 248, 0.3);
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-
-    .kpi-val-row {
-      display: flex;
-      align-items: baseline;
-      gap: 5px;
-      margin: 1px 0 4px;
-    }
-
-    .kpi-num {
-      font-size: 1.55rem;
-      font-weight: 900;
-      font-family: var(--font-mono);
-      line-height: 1;
-      color: var(--primary);
-      letter-spacing: -0.04em;
-    }
-
-    .kpi-unit {
-      font-size: 0.68rem;
-      color: var(--text-muted);
-      font-weight: 600;
-    }
-
-    .kpi-sub-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 2px;
-      border-top: 1px solid var(--bg-card-border);
-      padding-top: 4px;
-    }
-
-    .sub-stat-item {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .sub-stat-label {
-      font-size: 0.6rem;
-      color: var(--text-muted);
-      margin-bottom: 1px;
-    }
-
-    .sub-stat-val {
-      font-size: 0.74rem;
-      font-weight: 800;
-      font-family: var(--font-mono);
-      color: var(--text-main);
-    }
-
-    .sub-stat-val.highlight {
-      color: var(--warning);
-    }
-
-
-    /* 雷達回波區塊 (填滿剩餘高度) */
-    .radar-panel {
-      flex: 1;
-      min-height: 0;
-      background: var(--bg-card);
-      border: 1px solid var(--bg-card-border);
-      border-radius: var(--radius-md);
-      padding: 8px 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      overflow: hidden;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-    }
-
-    .radar-header {
-      flex-shrink: 0;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 6px;
-    }
-
-    .radar-title {
-      font-size: 0.9rem;
-      font-weight: 800;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    /* 模式切換按鈕 */
-    .radar-mode-tabs {
-      display: flex;
-      gap: 3px;
-      background: rgba(0, 0, 0, 0.3);
-      padding: 2px;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--bg-card-border);
-    }
-
-    .mode-tab-btn {
-      padding: 3px 8px;
-      font-size: 0.7rem;
-      font-weight: 700;
-      border: none;
-      background: transparent;
-      color: var(--text-muted);
-      border-radius: 4px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 3px;
-      transition: all 0.15s;
-    }
-
-    .mode-tab-btn:hover {
-      color: var(--text-main);
-    }
-
-    .mode-tab-btn.active {
-      background: var(--primary);
-      color: #0b1120;
-      box-shadow: 0 2px 6px rgba(56, 189, 248, 0.3);
-    }
-
-    /* 雷達主視窗 (彈性自適應高度) */
-    .radar-viewport {
-      flex: 1;
-      min-height: 0;
-      position: relative;
-      background: #020617;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--bg-card-border);
-      overflow: hidden;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .radar-viewport img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      user-select: none;
-    }
-
-    .overlay-time {
-      position: absolute;
-      top: 8px;
-      left: 8px;
-      background: rgba(11, 17, 32, 0.85);
-      backdrop-filter: blur(6px);
-      border: 1px solid var(--bg-card-border);
-      padding: 3px 8px;
-      border-radius: 16px;
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      font-weight: 800;
-      color: var(--primary);
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      z-index: 5;
-    }
-
-    .overlay-badge {
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      background: rgba(11, 17, 32, 0.85);
-      backdrop-filter: blur(6px);
-      border: 1px solid var(--bg-card-border);
-      padding: 2px 7px;
-      border-radius: 4px;
-      font-size: 0.65rem;
-      font-weight: 700;
-      color: var(--text-muted);
-      z-index: 5;
-    }
-
-    /* 雷達控制列 */
-    .radar-controls {
-      flex-shrink: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .slider-container {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .timeline-slider {
-      flex: 1;
-      height: 4px;
-      border-radius: 3px;
-      background: rgba(255, 255, 255, 0.15);
-      outline: none;
-      cursor: pointer;
-      accent-color: var(--primary);
-    }
-
-    .frame-indicator {
-      font-family: var(--font-mono);
-      font-size: 0.7rem;
-      color: var(--text-muted);
-      min-width: 48px;
-      text-align: right;
-    }
-
-    .controls-btn-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-
-    .playback-group {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .btn-circle-ctrl {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      border: 1px solid var(--bg-card-border);
-      background: rgba(255, 255, 255, 0.04);
-      color: var(--text-main);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-
-    .btn-circle-ctrl:hover {
-      background: #1e2942;
-      border-color: var(--primary);
-    }
-
-    .btn-circle-ctrl.play {
-      width: 32px;
-      height: 32px;
-      background: var(--primary);
-      border-color: var(--primary);
-      color: #0b1120;
-      box-shadow: 0 0 10px rgba(56, 189, 248, 0.35);
-    }
-
-    .btn-circle-ctrl.play:hover {
-      background: #7dd3fc;
-      transform: scale(1.05);
-    }
-
-    .time-span-group {
-      display: flex;
-      gap: 2px;
-      background: rgba(0, 0, 0, 0.3);
-      padding: 2px;
-      border-radius: 4px;
-      border: 1px solid var(--bg-card-border);
-    }
-
-    .time-span-btn {
-      padding: 2px 6px;
-      font-size: 0.68rem;
-      font-weight: 700;
-      border: none;
-      background: transparent;
-      color: var(--text-muted);
-      border-radius: 3px;
-      cursor: pointer;
-    }
-
-    .time-span-btn.active {
-      background: rgba(255, 255, 255, 0.12);
-      color: var(--text-main);
-    }
-
-    /* dBZ 強度圖例尺 */
-    .dbz-legend-bar {
-      flex-shrink: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      padding-top: 2px;
-    }
-
-    .dbz-gradient {
-      height: 6px;
-      border-radius: 2px;
-      background: linear-gradient(to right, 
-        #9c9c9c 0%, #00e0fe 12%, #0090fe 24%, #00fe00 36%, 
-        #00b800 48%, #fefe00 60%, #fe9000 72%, #fe0000 84%, #d800d8 100%
-      );
-    }
-
-    .dbz-marks {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.62rem;
-      font-family: var(--font-mono);
-      color: var(--text-muted);
-    }
-
-
-    /* 旋轉圖示動畫 */
-    .spinning {
-      animation: spin 0.8s linear infinite;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-  </style>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
@@ -621,7 +33,7 @@
     <header>
       <div class="header-brand">
         <div class="brand-icon">
-          <i data-lucide="radar" style="width: 20px; height: 20px;"></i>
+          <span aria-hidden="true" style="width: 20px; height: 20px;">◉</span>
         </div>
         <div class="brand-text">
           <h1>
@@ -638,134 +50,140 @@
           <span id="headerClock">--:--:--</span>
         </div>
         <button class="btn-refresh" id="btnRefresh" title="手動更新資料">
-          <i data-lucide="refresh-cw" id="iconRefresh" style="width: 13px; height: 13px;"></i>
+          <span aria-hidden="true" id="iconRefresh" style="width: 13px; height: 13px;">↻</span>
           <span>更新</span>
         </button>
       </div>
     </header>
 
+    <div class="data-status" id="dataStatus" role="status" aria-live="polite">正在取得最新觀測資料…</div>
     <!-- 2 個即時雨量觀測站點 (支援自訂切換，預設小港鳳森 + 鳳鼻頭) -->
-    <div class="kpi-grid">
+    <section class="kpi-grid" aria-label="自選測站雨量">
       <!-- 1. 測站 1 -->
       <div class="kpi-card linyuan" id="card1">
         <div class="kpi-header">
           <div class="station-select-wrapper">
-            <select class="station-select" id="stationSelect1" title="點擊切換測站 1">
+            <select class="station-select" id="stationSelect1" aria-label="測站 1" title="點擊切換測站 1">
               <option value="C0V45" selected>鳳森 (小港)</option>
             </select>
             <span class="code-badge" id="card1Code">C0V45 · 小港</span>
           </div>
-          <span class="rain-status-badge" id="card1Status">無雨</span>
+          <span class="rain-status-badge" id="card1Status">載入中</span>
         </div>
         <div class="kpi-val-row">
-          <div class="kpi-num" id="card1_10m">0.0</div>
+          <div class="kpi-num" id="card1_10m">—</div>
           <div class="kpi-unit">mm / 10分鐘</div>
         </div>
         <div class="kpi-sub-grid">
           <div class="sub-stat-item">
             <span class="sub-stat-label">1小時</span>
-            <span class="sub-stat-val" id="card1_1h">0.0 mm</span>
+            <span class="sub-stat-val" id="card1_1h">— mm</span>
           </div>
           <div class="sub-stat-item">
             <span class="sub-stat-label">3小時</span>
-            <span class="sub-stat-val" id="card1_3h">0.0 mm</span>
+            <span class="sub-stat-val" id="card1_3h">— mm</span>
           </div>
           <div class="sub-stat-item">
             <span class="sub-stat-label">24小時</span>
-            <span class="sub-stat-val" id="card1_24h">0.0 mm</span>
+            <span class="sub-stat-val" id="card1_24h">— mm</span>
           </div>
           <div class="sub-stat-item">
             <span class="sub-stat-label">本日累積</span>
-            <span class="sub-stat-val highlight" id="card1Today">0.0 mm</span>
+            <span class="sub-stat-val highlight" id="card1Today">— mm</span>
           </div>
         </div>
+        <p class="observation-time" id="card1Time">觀測時間：—</p>
       </div>
 
       <!-- 2. 測站 2 -->
       <div class="kpi-card linyuan" id="card2">
         <div class="kpi-header">
           <div class="station-select-wrapper">
-            <select class="station-select" id="stationSelect2" title="點擊切換測站 2">
+            <select class="station-select" id="stationSelect2" aria-label="測站 2" title="點擊切換測站 2">
               <option value="C0V84" selected>鳳鼻頭 (小港)</option>
             </select>
             <span class="code-badge" id="card2Code">C0V84 · 小港</span>
           </div>
-          <span class="rain-status-badge" id="card2Status">無雨</span>
+          <span class="rain-status-badge" id="card2Status">載入中</span>
         </div>
         <div class="kpi-val-row">
-          <div class="kpi-num" id="card2_10m">0.0</div>
+          <div class="kpi-num" id="card2_10m">—</div>
           <div class="kpi-unit">mm / 10分鐘</div>
         </div>
         <div class="kpi-sub-grid">
           <div class="sub-stat-item">
             <span class="sub-stat-label">1小時</span>
-            <span class="sub-stat-val" id="card2_1h">0.0 mm</span>
+            <span class="sub-stat-val" id="card2_1h">— mm</span>
           </div>
           <div class="sub-stat-item">
             <span class="sub-stat-label">3小時</span>
-            <span class="sub-stat-val" id="card2_3h">0.0 mm</span>
+            <span class="sub-stat-val" id="card2_3h">— mm</span>
           </div>
           <div class="sub-stat-item">
             <span class="sub-stat-label">24小時</span>
-            <span class="sub-stat-val" id="card2_24h">0.0 mm</span>
+            <span class="sub-stat-val" id="card2_24h">— mm</span>
           </div>
           <div class="sub-stat-item">
             <span class="sub-stat-label">本日累積</span>
-            <span class="sub-stat-val highlight" id="card2Today">0.0 mm</span>
+            <span class="sub-stat-val highlight" id="card2Today">— mm</span>
           </div>
         </div>
+        <p class="observation-time" id="card2Time">觀測時間：—</p>
       </div>
-    </div>
+    </section>
 
     <!-- 雷達回波動態觀測器 -->
     <div class="radar-panel">
       <div class="radar-header">
         <div class="radar-title">
-          <i data-lucide="radar" style="color: var(--primary); width: 18px; height: 18px;"></i>
+          <span aria-hidden="true" style="color: var(--primary); width: 18px; height: 18px;">◉</span>
           <span>雷達回波動態觀測器</span>
         </div>
 
         <div class="radar-mode-tabs" id="radarTabs">
-          <button class="mode-tab-btn active" data-mode="linyuan">🎯 林園降雨雷達</button>
-          <button class="mode-tab-btn" data-mode="radar_no_terrain">🌀 全臺無地形</button>
-          <button class="mode-tab-btn" data-mode="radar_with_terrain">🏔️ 全臺有地形</button>
-          <button class="mode-tab-btn" data-mode="satellite_taiwan">🛰️ 衛星雲圖(全台)</button>
+          <button class="mode-tab-btn active" data-mode="linyuan">林園降雨雷達</button>
+          <button class="mode-tab-btn" data-mode="radar_no_terrain">全臺無地形</button>
+          <button class="mode-tab-btn" data-mode="radar_with_terrain">全臺有地形</button>
+          <button class="mode-tab-btn" data-mode="satellite_taiwan">衛星雲圖</button>
         </div>
       </div>
 
       <!-- 雷達視窗畫面 -->
-      <div class="radar-viewport">
+      <div class="radar-meta">
         <div class="overlay-time" id="radarTimeText">
-          <i data-lucide="clock" style="width: 14px; height: 14px;"></i>
+          <span aria-hidden="true" style="width: 14px; height: 14px;">◷</span>
           <span id="radarTimestamp">載入中...</span>
         </div>
         <div class="overlay-badge" id="radarBadge">林園降雨雷達 (250m解析度)</div>
-        <img id="radarImg" src="" alt="雷達回波圖">
+      </div>
+      <div class="radar-viewport" aria-busy="true">
+        <img id="radarImg" alt="雷達回波圖" hidden>
+        <p id="imageStatus" role="status">正在載入觀測影像…</p>
       </div>
 
       <!-- 控制列 -->
       <div class="radar-controls">
         <div class="slider-container">
-          <input type="range" class="timeline-slider" id="radarSlider" min="0" max="0" value="0">
+          <input type="range" class="timeline-slider" id="radarSlider" aria-label="影像時間軸" min="0" max="0" value="0">
           <span class="frame-indicator" id="frameCounter">0 / 0</span>
         </div>
 
         <div class="controls-btn-row">
           <div class="playback-group">
             <button class="btn-circle-ctrl" id="btnFirst" title="回到第一張">
-              <i data-lucide="chevrons-left" style="width: 15px; height: 15px;"></i>
+              <span aria-hidden="true" style="width: 15px; height: 15px;">⇤</span>
             </button>
             <button class="btn-circle-ctrl" id="btnPrev" title="上一張">
-              <i data-lucide="chevron-left" style="width: 15px; height: 15px;"></i>
+              <span aria-hidden="true" style="width: 15px; height: 15px;">‹</span>
             </button>
-            <button class="btn-circle-ctrl play" id="btnPlayPause" title="播放 / 暫停">
-              <i data-lucide="play" id="playIcon" style="width: 18px; height: 18px; margin-left: 2px;"></i>
+            <button class="btn-circle-ctrl play" id="btnPlayPause" aria-label="播放影像" aria-pressed="false" title="播放 / 暫停">
+              <span aria-hidden="true" id="playIcon" style="width: 18px; height: 18px; margin-left: 2px;">▶</span>
             </button>
             <button class="btn-circle-ctrl" id="btnNext" title="下一張">
-              <i data-lucide="chevron-right" style="width: 15px; height: 15px;"></i>
+              <span aria-hidden="true" style="width: 15px; height: 15px;">›</span>
             </button>
             <button class="btn-circle-ctrl" id="btnLast" title="跳到最新一張">
-              <i data-lucide="chevrons-right" style="width: 15px; height: 15px;"></i>
+              <span aria-hidden="true" style="width: 15px; height: 15px;">⇥</span>
             </button>
           </div>
 
@@ -786,733 +204,18 @@
         <div class="dbz-marks">
           <span>0 dBZ</span>
           <span>15</span>
-          <span>30 (小雨)</span>
-          <span>40 (大雨)</span>
-          <span>50 (豪大雨)</span>
-          <span>60+ (強降雨)</span>
+          <span>30</span>
+          <span>40</span>
+          <span>50</span>
+          <span>60+</span>
         </div>
       </div>
     </div>
+    <footer>資料來源：中央氣象署 · 雨量為測站觀測分級，非官方特報<br><a href="https://www.cwa.gov.tw/V8/C/P/Warning/W26.html" target="_blank" rel="noopener noreferrer">查看官方豪（大）雨特報 ↗</a> · <span id="sourceTime">尚未更新</span></footer>
   </div>
 
-  <script>
-    // --- 完整高雄觀測站分區列表 (預設小港區鳳森與鳳鼻頭) ---
-    const KAOHSIUNG_STATIONS_GROUPS = [
-      {
-        group: "📍 小港區 (預設核心)",
-        stations: [
-          { code: "C0V45", name: "鳳森", district: "小港" },
-          { code: "C0V84", name: "鳳鼻頭", district: "小港" }
-        ]
-      },
-      {
-        group: "🏙️ 高雄市區測站",
-        stations: [
-          { code: "C0V44", name: "鳳山", district: "鳳山" },
-          { code: "G2P82", name: "農試鳳山分所", district: "鳳山" },
-          { code: "C0V89", name: "前鎮", district: "前鎮" },
-          { code: "C0V71", name: "苓雅", district: "苓雅" },
-          { code: "C0V49", name: "新興", district: "新興" },
-          { code: "C0V70", name: "三民", district: "三民" },
-          { code: "C0V69", name: "鼓山", district: "鼓山" },
-          { code: "C0V81", name: "左營", district: "左營" },
-          { code: "46744", name: "高雄", district: "楠梓" },
-          { code: "CAP07", name: "高雄燈塔", district: "旗津" }
-        ]
-      },
-      {
-        group: "🏭 林園 / 大樹 / 仁武 / 大社",
-        stations: [
-          { code: "C0V90", name: "汕尾", district: "林園" },
-          { code: "C0V91", name: "大樹", district: "大樹" },
-          { code: "C0V35", name: "溪埔", district: "大樹" },
-          { code: "CAP06", name: "國三S385K", district: "大樹" },
-          { code: "C0V77", name: "大社", district: "大社" },
-          { code: "CAP04", name: "國一N361K", district: "仁武" }
-        ]
-      },
-      {
-        group: "🌾 北高雄 (岡山/橋頭/梓官/彌陀/路竹等)",
-        stations: [
-          { code: "C0V66", name: "岡山", district: "岡山" },
-          { code: "CAP02", name: "國一S346K", district: "岡山" },
-          { code: "C0V76", name: "橋頭", district: "橋頭" },
-          { code: "C0V61", name: "梓官", district: "梓官" },
-          { code: "C0V85", name: "蚵仔寮", district: "梓官" },
-          { code: "C0V65", name: "彌陀", district: "彌陀" },
-          { code: "C0V86", name: "南寮", district: "彌陀" },
-          { code: "C0V87", name: "文安", district: "彌陀" },
-          { code: "C0V62", name: "永安", district: "永安" },
-          { code: "C0V63", name: "茄萣", district: "茄萣" },
-          { code: "C0V88", name: "興達", district: "茄萣" },
-          { code: "C0V75", name: "路竹", district: "路竹" },
-          { code: "CAP01", name: "國一S342K", district: "路竹" },
-          { code: "C0V53", name: "阿蓮", district: "阿蓮" },
-          { code: "C0V40", name: "阿公店", district: "燕巢" },
-          { code: "C1V39", name: "尖山", district: "燕巢" },
-          { code: "01P28", name: "水利署古亭坑", district: "田寮" },
-          { code: "C0V64", name: "湖內", district: "湖內" }
-        ]
-      },
-      {
-        group: "⛰️ 東高雄山區 (旗山/美濃/六龜/甲仙/桃源等)",
-        stations: [
-          { code: "C0V74", name: "旗山", district: "旗山" },
-          { code: "72V14", name: "高改旗南分場", district: "旗山" },
-          { code: "C2V31", name: "美濃", district: "美濃" },
-          { code: "C2V57", name: "吉東", district: "美濃" },
-          { code: "C0V36", name: "內門", district: "內門" },
-          { code: "C2V58", name: "瑞山", district: "內門" },
-          { code: "C2V26", name: "月眉", district: "杉林" },
-          { code: "88V56", name: "集來", district: "杉林" },
-          { code: "C0V80", name: "六龜", district: "六龜" },
-          { code: "C1V59", name: "新發", district: "六龜" },
-          { code: "C1V34", name: "大津", district: "六龜" },
-          { code: "E2P98", name: "六龜林試", district: "六龜" },
-          { code: "C2V25", name: "甲仙", district: "甲仙" },
-          { code: "C0V82", name: "小林", district: "甲仙" },
-          { code: "C0V79", name: "萬山", district: "茂林" },
-          { code: "81V96", name: "茂林國小", district: "茂林" },
-          { code: "C1V20", name: "梅山", district: "桃源" },
-          { code: "C1V23", name: "高中", district: "桃源" },
-          { code: "01V07", name: "天池", district: "桃源" },
-          { code: "C1V60", name: "藤枝", district: "桃源" },
-          { code: "C0V94", name: "美瓏山", district: "桃源" },
-          { code: "81V83", name: "那瑪夏國中", district: "那瑪夏" }
-        ]
-      }
-    ];
-
-    // 舊代碼自動遷移映射表
-    const DEPRECATED_CODE_MAP = {
-      'C0V72': 'C0V90', // 原林園 -> 汕尾
-      'C0V73': 'C0V45', // 原大寮 -> 鳳森
-      'C0V68': 'CAP04', // 原仁武 -> 國一N361K
-      'C0V21': 'C1V20', // 原復興 -> 梅山
-      'C0V93': '01V07'  // 原天池 -> 天池新碼 01V07
-    };
-
-    const savedStations = (() => {
-      try {
-        const stored = JSON.parse(localStorage.getItem('kh_rain_stations'));
-        if (Array.isArray(stored) && stored.length >= 2) {
-          const s1 = DEPRECATED_CODE_MAP[stored[0]] || stored[0];
-          const s2 = DEPRECATED_CODE_MAP[stored[1]] || stored[1];
-          return [s1, s2];
-        }
-      } catch (e) {}
-      return ['C0V45', 'C0V84'];
-    })();
-
-    // --- 應用狀態 ---
-    const state = {
-      radarMode: 'linyuan',
-      radarScans: [],
-      activeIndex: 0,
-      isPlaying: false,
-      timer: null,
-      hoursFilter: 1,
-      stations: [],
-      selectedStations: savedStations
-    };
-
-    // --- 即時時鐘 ---
-    function updateClock() {
-      const now = new Date();
-      const pad = n => String(n).padStart(2, '0');
-      document.getElementById('headerClock').innerText = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-    }
-    setInterval(updateClock, 1000);
-    updateClock();
-
-    // --- 動態更新頂部 Header 地區標籤 ---
-    function updateHeaderDistrictTag() {
-      const code1 = state.selectedStations[0] || 'C0V45';
-      const code2 = state.selectedStations[1] || 'C0V84';
-
-      const st1 = findStation(code1);
-      const st2 = findStation(code2);
-
-      let d1 = '', d2 = '';
-      for (const grp of KAOHSIUNG_STATIONS_GROUPS) {
-        const s1 = grp.stations.find(s => s.code === code1);
-        if (s1) d1 = s1.district;
-        const s2 = grp.stations.find(s => s.code === code2);
-        if (s2) d2 = s2.district;
-      }
-      if (!d1 && st1 && st1.region) d1 = st1.region.replace('區', '');
-      if (!d2 && st2 && st2.region) d2 = st2.region.replace('區', '');
-
-      const tag = document.getElementById('headerDistrictTag');
-      if (!tag) return;
-
-      if (d1 && d2) {
-        if (d1 === d2) {
-          tag.innerText = `📍 ${d1}區`;
-        } else {
-          tag.innerText = `📍 ${d1} · ${d2}`;
-        }
-      } else if (d1 || d2) {
-        tag.innerText = `📍 ${d1 || d2}區`;
-      } else {
-        tag.innerText = `📍 即時測站`;
-      }
-    }
-
-    // --- 初始化測站下拉選單 ---
-    function initStationDropdowns() {
-      const selectConfigs = [
-        { id: 'stationSelect1', defaultVal: state.selectedStations[0] || 'C0V45', index: 0 },
-        { id: 'stationSelect2', defaultVal: state.selectedStations[1] || 'C0V84', index: 1 }
-      ];
-
-      selectConfigs.forEach(({ id, defaultVal, index }) => {
-        const sel = document.getElementById(id);
-        if (!sel) return;
-        sel.innerHTML = '';
-
-        KAOHSIUNG_STATIONS_GROUPS.forEach(grp => {
-          const optgrp = document.createElement('optgroup');
-          optgrp.label = grp.group;
-          grp.stations.forEach(st => {
-            const opt = document.createElement('option');
-            opt.value = st.code;
-            opt.textContent = `${st.name} (${st.district})`;
-            optgrp.appendChild(opt);
-          });
-          sel.appendChild(optgrp);
-        });
-
-        sel.value = defaultVal;
-
-        sel.addEventListener('change', () => {
-          state.selectedStations[index] = sel.value;
-          try {
-            localStorage.setItem('kh_rain_stations', JSON.stringify(state.selectedStations));
-          } catch(e) {}
-          
-          updateHeaderDistrictTag();
-
-          if (state.stations && state.stations.length > 0) {
-            renderRainfall({ stations: state.stations });
-          } else {
-            fetchData();
-          }
-        });
-      });
-
-      updateHeaderDistrictTag();
-    }
-
-    // --- 資料載入 ---
-    async function fetchData() {
-      const icon = document.getElementById('iconRefresh');
-      if (icon) icon.classList.add('spinning');
-
-      try {
-        let rainfall = null;
-        let radar = null;
-
-        // 嘗試從 Python 本地服務器獲取
-        try {
-          const res = await fetch('/api/all', { cache: 'no-store' });
-          if (res.ok) {
-            const data = await res.json();
-            rainfall = data.rainfall;
-            radar = data.radar;
-          }
-        } catch (e) {}
-
-        // 前端直連備援模式 (無 Python 伺服器時，如 GitHub Pages / 手機直連)
-        if (!radar || !rainfall || !rainfall.stations || rainfall.stations.length === 0) {
-          const directData = await directFallback();
-          if (!radar && directData.radar) renderRadar(directData.radar);
-          if ((!rainfall || !rainfall.stations || rainfall.stations.length === 0) && directData.rainfall) {
-            renderRainfall(directData.rainfall);
-          } else if (rainfall) {
-            renderRainfall(rainfall);
-          }
-        } else {
-          renderRainfall(rainfall);
-          renderRadar(radar);
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        if (icon) icon.classList.remove('spinning');
-      }
-    }
-
-    const CWA_API_KEY = 'CWA-8059CE68-7A75-4C3D-BDA6-CBF3BC6447EF';
-
-    // --- 前端直連氣象署 (官方 OpenData API + JSONP 零跨域限制) ---
-    async function directFallback() {
-      const result = { radar: null, rainfall: null };
-      const cacheBust = Date.now();
-
-      // 1. 直連林園降雨雷達 (JSONP 腳本注入，零 CORS 限制)
-      const radarRainPromise = new Promise((resolve) => {
-        const oldScript = document.getElementById('cwaRadarRainScript');
-        if (oldScript) oldScript.remove();
-        const script = document.createElement('script');
-        script.id = 'cwaRadarRainScript';
-        script.src = `https://www.cwa.gov.tw/Data/js/obs_img/Observe_radar_rain.js?_=${cacheBust}`;
-        script.onload = () => {
-          if (window.RadarRainImg && window.RadarRainImg.Area2) {
-            const scans = Object.values(window.RadarRainImg.Area2.size0 || {}).map(i => ({
-              url: `https://www.cwa.gov.tw/Data/radar_rain/${i.img}?_=${cacheBust}`,
-              time: i.text
-            }));
-            if (!result.radar) result.radar = {};
-            if (!result.radar.areas) result.radar.areas = {};
-            result.radar.areas.Area2 = { scans_hd: scans };
-          }
-          resolve();
-        };
-        script.onerror = () => resolve();
-        document.body.appendChild(script);
-      });
-
-      // 2. 直連全臺雷達 (無地形與有地形，JSONP 腳本注入)
-      const radarPromise = new Promise((resolve) => {
-        const oldScript = document.getElementById('cwaRadarScript');
-        if (oldScript) oldScript.remove();
-        const script = document.createElement('script');
-        script.id = 'cwaRadarScript';
-        script.src = `https://www.cwa.gov.tw/Data/js/obs_img/Observe_radar.js?_=${cacheBust}`;
-        script.onload = () => {
-          try {
-            if (window.RadarImg && window.RadarImg.Tab0) {
-              const noT = Object.values(window.RadarImg.Tab0.Area0?.size0 || {}).map(i => ({
-                url: `https://www.cwa.gov.tw/Data/radar/${i.img}?_=${cacheBust}`,
-                time: i.text
-              }));
-              const withT = Object.values(window.RadarImg.Tab0.Area1?.size0 || {}).map(i => ({
-                url: `https://www.cwa.gov.tw/Data/radar/${i.img}?_=${cacheBust}`,
-                time: i.text
-              }));
-              if (!result.radar) result.radar = {};
-              result.radar.no_terrain_scans = noT;
-              result.radar.with_terrain_scans = withT;
-            }
-          } catch (e) {}
-          resolve();
-        };
-        script.onerror = () => resolve();
-        document.body.appendChild(script);
-      });
-
-      // 3. 直連高雄雨量 (使用氣象署官方 OpenData API，完全支援瀏覽器跨網域 CORS)
-      const rainfallPromise = (async () => {
-        try {
-          const cwaUrl = `https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0002-001?Authorization=${CWA_API_KEY}&_=${cacheBust}`;
-          const res = await fetch(cwaUrl);
-          if (res.ok) {
-            const data = await res.json();
-            const allStations = data?.records?.Station || [];
-            const cleanNum = v => {
-              const n = parseFloat(v);
-              return isNaN(n) || n < 0 ? 0.0 : n;
-            };
-            const khStations = allStations.filter(st => {
-              const county = st.GeoInfo?.CountyName || '';
-              const countyCode = st.GeoInfo?.CountyCode || '';
-              return county.includes('高雄') || countyCode === '64000';
-            });
-            const stations = khStations.map(st => {
-              const rf = st.RainfallElement || {};
-              const ten_min = rf.Past10Min?.Precipitation ?? '-';
-              const one_hr = rf.Past1hr?.Precipitation ?? '-';
-              const three_hr = rf.Past3hr?.Precipitation ?? '-';
-              const six_hr = rf.Past6Hr?.Precipitation ?? '-';
-              const twl_hr = rf.Past12hr?.Precipitation ?? '-';
-              const all_hr = rf.Past24hr?.Precipitation ?? '-';
-              const today = rf.Now?.Precipitation ?? '-';
-              const yesterday = rf.Past2days?.Precipitation ?? '-';
-              const town = st.GeoInfo?.TownName || '';
-              const rawId = String(st.StationId || '');
-              const cleanCode = (rawId.length === 6 && /[0-9]$/.test(rawId)) ? rawId.slice(0, 5) : rawId;
-              return {
-                code: cleanCode,
-                fullCode: rawId,
-                name: st.StationName || '',
-                region: town ? `${town}區` : '高雄市',
-                ten_min: String(ten_min),
-                ten_min_num: cleanNum(ten_min),
-                one_hr: String(one_hr),
-                one_hr_num: cleanNum(one_hr),
-                three_hr: String(three_hr),
-                three_hr_num: cleanNum(three_hr),
-                six_hr: String(six_hr),
-                twl_hr: String(twl_hr),
-                all_hr: String(all_hr),
-                all_hr_num: cleanNum(all_hr),
-                today: String(today),
-                today_num: cleanNum(today),
-                yesterday: String(yesterday)
-              };
-            });
-
-            if (stations.length > 0) {
-              result.rainfall = { stations: stations };
-              return;
-            }
-          }
-        } catch (e) {
-          console.warn('OpenData API fetch error:', e);
-        }
-      })();
-
-      // 4. 直連全臺衛星雲圖 (JSONP 腳本注入)
-      const satPromise = new Promise((resolve) => {
-        const oldScript = document.getElementById('cwaSatScript');
-        if (oldScript) oldScript.remove();
-        const script = document.createElement('script');
-        script.id = 'cwaSatScript';
-        script.src = `https://www.cwa.gov.tw/Data/js/obs_img/Observe_sat.js?_=${cacheBust}`;
-        script.onload = () => {
-          try {
-            if (window.SatImg && window.SatImg.Tab1 && window.SatImg.Tab1.Area1) {
-              const raw = window.SatImg.Tab1.Area1.size0?.C || window.SatImg.Tab1.Area1.size1?.C || {};
-              const scans = Object.values(raw).map(i => ({
-                url: `https://www.cwa.gov.tw/Data/satellite/${i.img}?_=${cacheBust}`,
-                time: i.text
-              }));
-              if (!result.radar) result.radar = {};
-              result.radar.satellite_scans = scans;
-            }
-          } catch (e) {}
-          resolve();
-        };
-        script.onerror = () => resolve();
-        document.body.appendChild(script);
-      });
-
-      await Promise.all([radarRainPromise, radarPromise, rainfallPromise, satPromise]);
-      return result;
-    }
-
-    // --- 測站搜尋匹配 ---
-    function findStation(code) {
-      if (!code) return null;
-      const targetCode = String(code).trim().toUpperCase();
-
-      // 先查選單裡的測站定義
-      let stationMeta = null;
-      for (const grp of KAOHSIUNG_STATIONS_GROUPS) {
-        const found = grp.stations.find(s => String(s.code).toUpperCase() === targetCode);
-        if (found) {
-          stationMeta = found;
-          break;
-        }
-      }
-
-      // 1. 從已下載的即時雨量資料中找
-      if (state.stations && state.stations.length > 0) {
-        // (1) 代碼完全比對
-        let matched = state.stations.find(s => {
-          const sCode = String(s.code || '').trim().toUpperCase();
-          const sFull = String(s.fullCode || '').trim().toUpperCase();
-          return (sCode && sCode === targetCode) || (sFull && sFull === targetCode);
-        });
-        if (matched) return matched;
-
-        // (2) 5 碼前綴比對 (處理如 46744 vs 467441, C0V45 vs C0V450)
-        if (targetCode.length >= 4) {
-          const tPrefix = targetCode.slice(0, 5);
-          matched = state.stations.find(s => {
-            const sCode = String(s.code || '').trim().toUpperCase();
-            const sFull = String(s.fullCode || '').trim().toUpperCase();
-            return (sCode.length >= 4 && sCode.slice(0, 5) === tPrefix) || 
-                   (sFull.length >= 4 && sFull.slice(0, 5) === tPrefix);
-          });
-          if (matched) return matched;
-        }
-
-        // (3) 站名比對
-        if (stationMeta && stationMeta.name) {
-          matched = state.stations.find(s => s.name === stationMeta.name);
-          if (matched) return matched;
-        }
-      }
-
-      // 2. 備援預設資訊 (從選單清單中搜尋)
-      if (stationMeta) {
-        return {
-          code: stationMeta.code,
-          name: stationMeta.name,
-          region: `${stationMeta.district}區`,
-          ten_min: '0.0',
-          ten_min_num: 0,
-          one_hr: '0.0',
-          one_hr_num: 0,
-          three_hr: '0.0',
-          three_hr_num: 0,
-          all_hr: '0.0',
-          all_hr_num: 0,
-          today: '0.0',
-          today_num: 0
-        };
-      }
-      return null;
-    }
-
-    // --- 渲染 2 個自選測站雨量卡片 ---
-    function renderRainfall(data) {
-      if (!data || !data.stations) return;
-      state.stations = data.stations;
-
-      const code1 = state.selectedStations[0] || 'C0V45';
-      const code2 = state.selectedStations[1] || 'C0V84';
-
-      const st1 = findStation(code1);
-      const st2 = findStation(code2);
-
-      fillCard('card1', st1, code1);
-      fillCard('card2', st2, code2);
-      updateHeaderDistrictTag();
-    }
-
-    function fillCard(cardPrefix, st, targetCode) {
-      let district = '';
-      for (const grp of KAOHSIUNG_STATIONS_GROUPS) {
-        const found = grp.stations.find(s => s.code === targetCode);
-        if (found) {
-          district = found.district;
-          break;
-        }
-      }
-      if (!district && st && st.region) {
-        district = st.region.replace('區', '');
-      }
-
-      const codeBadge = document.getElementById(`${cardPrefix}Code`);
-      if (codeBadge) {
-        codeBadge.innerText = `${targetCode} · ${district || '測站'}`;
-      }
-
-      const tenMin = (st && st.ten_min !== undefined) ? st.ten_min : '0.0';
-      const el10m = document.getElementById(`${cardPrefix}_10m`);
-      if (el10m) el10m.innerText = tenMin;
-
-      const el1h = document.getElementById(`${cardPrefix}_1h`);
-      if (el1h) el1h.innerText = ((st && st.one_hr !== undefined) ? st.one_hr : '0.0') + ' mm';
-
-      const el3h = document.getElementById(`${cardPrefix}_3h`);
-      if (el3h) el3h.innerText = ((st && st.three_hr !== undefined) ? st.three_hr : '0.0') + ' mm';
-
-      const el24h = document.getElementById(`${cardPrefix}_24h`);
-      if (el24h) el24h.innerText = ((st && st.all_hr !== undefined) ? st.all_hr : '0.0') + ' mm';
-
-      const elToday = document.getElementById(`${cardPrefix}Today`);
-      if (elToday) elToday.innerText = ((st && st.today !== undefined) ? st.today : '0.0') + ' mm';
-
-      const badge = document.getElementById(`${cardPrefix}Status`);
-      if (badge) {
-        const ten_num = (st && st.ten_min_num) || 0;
-        const one_num = (st && st.one_hr_num) || 0;
-
-        if (ten_num >= 10 || one_num >= 40) {
-          badge.innerText = '豪大雨';
-          badge.style.color = 'var(--danger)';
-          badge.style.borderColor = 'var(--danger)';
-        } else if (ten_num >= 3 || one_num >= 15) {
-          badge.innerText = '大雨';
-          badge.style.color = 'var(--warning)';
-          badge.style.borderColor = 'var(--warning)';
-        } else if (ten_num > 0 || one_num > 0) {
-          badge.innerText = '降雨中';
-          badge.style.color = 'var(--primary)';
-          badge.style.borderColor = 'var(--primary)';
-        } else {
-          badge.innerText = '無雨';
-          badge.style.color = 'var(--text-muted)';
-          badge.style.borderColor = 'var(--bg-card-border)';
-        }
-      }
-    }
-
-    // --- 雷達渲染與播放 ---
-    function renderRadar(data) {
-      if (!data) return;
-
-      if (state.radarMode === 'linyuan') {
-        const all = (data.areas && data.areas.Area2) ? data.areas.Area2.scans_hd : [];
-        let count = all.length;
-        if (state.hoursFilter === 0.5) count = Math.min(15, all.length);
-        else if (state.hoursFilter === 1) count = Math.min(30, all.length);
-        else if (state.hoursFilter === 2) count = Math.min(60, all.length);
-        else if (state.hoursFilter === 3) count = Math.min(90, all.length);
-
-        state.radarScans = all.slice(0, count).reverse();
-        state.activeIndex = state.radarScans.length - 1;
-      } else if (state.radarMode === 'radar_no_terrain') {
-        const all = (data.no_terrain_scans && data.no_terrain_scans.length > 0) ? data.no_terrain_scans : [];
-        if (all.length > 0) {
-          let count = all.length;
-          if (state.hoursFilter === 0.5) count = Math.min(3, all.length);
-          else if (state.hoursFilter === 1) count = Math.min(6, all.length);
-          else if (state.hoursFilter === 2) count = Math.min(12, all.length);
-          else if (state.hoursFilter === 3) count = Math.min(18, all.length);
-
-          state.radarScans = all.slice(0, count).reverse();
-          state.activeIndex = state.radarScans.length - 1;
-        } else {
-          state.radarScans = [{ url: 'https://www.cwa.gov.tw/Data/radar/CV1_3600.png?_=' + Date.now(), time: '全臺無地形雷達' }];
-          state.activeIndex = 0;
-        }
-      } else if (state.radarMode === 'radar_with_terrain') {
-        const all = (data.with_terrain_scans && data.with_terrain_scans.length > 0) ? data.with_terrain_scans : [];
-        if (all.length > 0) {
-          let count = all.length;
-          if (state.hoursFilter === 0.5) count = Math.min(3, all.length);
-          else if (state.hoursFilter === 1) count = Math.min(6, all.length);
-          else if (state.hoursFilter === 2) count = Math.min(12, all.length);
-          else if (state.hoursFilter === 3) count = Math.min(18, all.length);
-
-          state.radarScans = all.slice(0, count).reverse();
-          state.activeIndex = state.radarScans.length - 1;
-        } else {
-          state.radarScans = [{ url: 'https://www.cwa.gov.tw/Data/radar/CV1_TW_3600.png?_=' + Date.now(), time: '全臺有地形雷達' }];
-          state.activeIndex = 0;
-        }
-      } else if (state.radarMode === 'satellite_taiwan') {
-        const all = (data.satellite_scans && data.satellite_scans.length > 0) ? data.satellite_scans : [];
-        if (all.length > 0) {
-          let count = all.length;
-          if (state.hoursFilter === 0.5) count = Math.min(3, all.length);
-          else if (state.hoursFilter === 1) count = Math.min(6, all.length);
-          else if (state.hoursFilter === 2) count = Math.min(12, all.length);
-          else if (state.hoursFilter === 3) count = Math.min(18, all.length);
-
-          state.radarScans = all.slice(0, count).reverse();
-          state.activeIndex = state.radarScans.length - 1;
-        } else {
-          state.radarScans = [{ url: 'https://www.cwa.gov.tw/Data/satellite/LCC_IR1_CR_2750/LCC_IR1_CR_2750.jpg?_=' + Date.now(), time: '全臺衛星雲圖 (色調強化)' }];
-          state.activeIndex = 0;
-        }
-      }
-
-      const slider = document.getElementById('radarSlider');
-      slider.max = Math.max(0, state.radarScans.length - 1);
-      slider.value = state.activeIndex;
-      updateRadarFrame();
-    }
-
-    function updateRadarFrame() {
-      if (state.radarScans.length === 0) return;
-      const current = state.radarScans[state.activeIndex] || state.radarScans[0];
-      const img = document.getElementById('radarImg');
-      if (img.src !== current.url) img.src = current.url;
-
-      document.getElementById('radarTimestamp').innerText = current.time || '即時觀測';
-      document.getElementById('frameCounter').innerText = `${state.activeIndex + 1} / ${state.radarScans.length}`;
-      document.getElementById('radarSlider').value = state.activeIndex;
-    }
-
-    // --- 播放動畫控制 ---
-    function togglePlay() {
-      state.isPlaying = !state.isPlaying;
-      const playIcon = document.getElementById('playIcon');
-      if (state.isPlaying) {
-        playIcon.setAttribute('data-lucide', 'pause');
-        lucide.createIcons();
-        state.timer = setInterval(() => {
-          if (state.radarScans.length <= 1) return;
-          state.activeIndex = (state.activeIndex + 1) % state.radarScans.length;
-          updateRadarFrame();
-        }, 650);
-      } else {
-        playIcon.setAttribute('data-lucide', 'play');
-        lucide.createIcons();
-        clearInterval(state.timer);
-      }
-    }
-
-    // --- 事件監聽器設定 ---
-    document.addEventListener('DOMContentLoaded', () => {
-      lucide.createIcons();
-
-      // 立即更新
-      document.getElementById('btnRefresh').addEventListener('click', fetchData);
-
-      // 播放按鈕
-      document.getElementById('btnPlayPause').addEventListener('click', togglePlay);
-      document.getElementById('btnFirst').addEventListener('click', () => {
-        state.activeIndex = 0;
-        updateRadarFrame();
-      });
-      document.getElementById('btnLast').addEventListener('click', () => {
-        state.activeIndex = state.radarScans.length - 1;
-        updateRadarFrame();
-      });
-      document.getElementById('btnPrev').addEventListener('click', () => {
-        if (state.activeIndex > 0) state.activeIndex--;
-        updateRadarFrame();
-      });
-      document.getElementById('btnNext').addEventListener('click', () => {
-        if (state.activeIndex < state.radarScans.length - 1) state.activeIndex++;
-        updateRadarFrame();
-      });
-
-      // 滑桿
-      document.getElementById('radarSlider').addEventListener('input', (e) => {
-        state.activeIndex = parseInt(e.target.value, 10);
-        updateRadarFrame();
-      });
-
-      // 雷達模式切換
-      document.querySelectorAll('#radarTabs .mode-tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          document.querySelectorAll('#radarTabs .mode-tab-btn').forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-          state.radarMode = btn.dataset.mode;
-          
-          const badge = document.getElementById('radarBadge');
-          if (state.radarMode === 'linyuan') badge.innerText = '林園降雨雷達 (250m解析度)';
-          else if (state.radarMode === 'radar_no_terrain') badge.innerText = '全臺雷達 (無地形)';
-          else if (state.radarMode === 'radar_with_terrain') badge.innerText = '全臺雷達 (有地形)';
-          else if (state.radarMode === 'satellite_taiwan') badge.innerText = '衛星雲圖 (全臺彩色色調強化)';
-          else badge.innerText = '即時影像觀測';
-
-          fetchData();
-        });
-      });
-
-      // 時間跨度按鈕
-      document.querySelectorAll('#spanGroup .time-span-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          document.querySelectorAll('#spanGroup .time-span-btn').forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-          state.hoursFilter = parseFloat(btn.dataset.hours);
-          fetchData();
-        });
-      });
-
-      // 手機休眠喚醒或切換回分頁時立即自動更新
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') {
-          fetchData();
-        }
-      });
-      window.addEventListener('pageshow', () => {
-        fetchData();
-      });
-
-      // 初始化測站下拉選單
-      initStationDropdowns();
-
-      // 初始化載入並設定每 60 秒自動背景刷新
-      fetchData();
-      setInterval(fetchData, 60000);
-
-      // 註冊 PWA Service Worker (支援手機安裝專屬 App 與高清圖示)
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./sw.js').catch(err => {
-          console.log('SW reg error:', err);
-        });
-      }
-    });
-  </script>
+  <script src="stations.js" defer></script>
+  <script src="weather.js" defer></script>
+  <script src="app.js" defer></script>
 </body>
 </html>
