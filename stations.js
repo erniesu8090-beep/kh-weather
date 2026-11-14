@@ -26,6 +26,7 @@
       {
         group: "🏭 林園 / 大樹 / 仁武 / 大社",
         stations: [
+          { code: "C0V72", name: "林園", district: "林園" },
           { code: "C0V90", name: "汕尾", district: "林園" },
           { code: "C0V91", name: "大樹", district: "大樹" },
           { code: "C0V35", name: "溪埔", district: "大樹" },

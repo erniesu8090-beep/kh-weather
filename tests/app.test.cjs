@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const path = require('node:path');
 const ROOT = path.join(__dirname, '..');
 
-function harness({offline = false, hosted = false, brokenImage = false} = {}) {
+function harness({offline = false, hosted = false, brokenImage = false, storedStations = null} = {}) {
   const nodes = new Map();
   class Element {
     constructor(id = '') { this.id=id; this.textContent=''; this.value=''; this.attributes={}; this.dataset={}; this.listeners={}; this.hidden=false; this.disabled=false; this.children=[]; this.src=''; const set = new Set(); this.classList={add:x=>set.add(x),remove:x=>set.delete(x),contains:x=>set.has(x)}; }
@@ -36,7 +36,7 @@ function harness({offline = false, hosted = false, brokenImage = false} = {}) {
     querySelector:selector=>selector==='.radar-viewport'?viewport:legend,
     querySelectorAll:selector=> selector.includes('btn-circle-ctrl') ? ['btnFirst','btnPrev','btnPlayPause','btnNext','btnLast'].map(id=>nodes.get(id)) : buttons.filter(b=>selector.includes('radarTabs') && b.dataset.mode || selector.includes('spanGroup') && b.dataset.hours)
   };
-  const context = vm.createContext({document,location:{hostname:hosted?'example.test':'localhost'}, navigator:{},localStorage:{getItem:()=>null,setItem:()=>{}},console,Date,Map,Promise,AbortController,setTimeout,clearTimeout,setInterval:()=>1,clearInterval:()=>{},queueMicrotask,fetch:async url=>{fetches++; await Promise.resolve(); if(offline) throw new Error('Offline'); if(String(url).endsWith('config.json')) return {ok:true,json:async()=>({cwaApiKey:'public-test-key'})}; if(String(url).includes('opendata')) return {ok:false,status:503}; return {ok:true,json:async()=>structuredClone(fixture)};},Image:class extends Element {set src(url){this._src=url;if(url) {imageLoads++;queueMicrotask(()=>brokenImage?this.onerror?.():this.onload?.());}} get src(){return this._src;}},addEventListener:(name,fn)=>events['window:'+name]=fn});
+  const context = vm.createContext({document,location:{hostname:hosted?'example.test':'localhost'}, navigator:{},localStorage:{getItem:key=>key==='kh_rain_stations'&&storedStations?JSON.stringify(storedStations):null,setItem:()=>{}},console,Date,Map,Promise,AbortController,setTimeout,clearTimeout,setInterval:()=>1,clearInterval:()=>{},queueMicrotask,fetch:async url=>{fetches++; await Promise.resolve(); if(offline) throw new Error('Offline'); if(String(url).endsWith('config.json')) return {ok:true,json:async()=>({cwaApiKey:'public-test-key'})}; if(String(url).includes('opendata')) return {ok:false,status:503}; return {ok:true,json:async()=>structuredClone(fixture)};},Image:class extends Element {set src(url){this._src=url;if(url) {imageLoads++;queueMicrotask(()=>brokenImage?this.onerror?.():this.onload?.());}} get src(){return this._src;}},addEventListener:(name,fn)=>events['window:'+name]=fn});
   context.window=context;
   for (const file of ['stations.js','weather.js','app.js']) vm.runInContext(fs.readFileSync(path.join(ROOT,file),'utf8'),context,{filename:file});
   return {context,nodes,buttons,events,viewport,legend,fixture,fetches:()=>fetches,imageLoads:()=>imageLoads,run:code=>vm.runInContext(code,context)};
@@ -93,4 +93,14 @@ test('historical frame is labeled as history while latest feed remains fresh',as
   assert.doesNotMatch(h.nodes.get('radarTimestamp').textContent,/來源資料過期/);
   h.run('renderRadar(state.data.radar)');
   assert.equal(h.run('state.activeIndex'),0);
+});
+test('Linyuan station C0V72 is listed before C0V90 and preserved across reload',()=>{
+  const h=harness({storedStations:['C0V72','C0V90']});
+  h.events.DOMContentLoaded();
+  const linyuanGroup=h.run('KAOHSIUNG_STATIONS_GROUPS.find(g=>g.stations.some(s=>s.code==="C0V72"))');
+  assert.ok(linyuanGroup);
+  const codes=linyuanGroup.stations.map(s=>s.code);
+  assert.ok(codes.indexOf('C0V72')<codes.indexOf('C0V90'));
+  assert.deepEqual(Array.from(h.run('state.selectedStations')),['C0V72','C0V90']);
+  assert.equal(h.nodes.get('stationSelect1').value,'C0V72');
 });
